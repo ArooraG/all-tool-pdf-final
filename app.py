@@ -1,7 +1,3 @@
-
-#### **3. `app.py` (مکمل اور آخری کوڈ)**
-(اس میں تمام ٹولز، بلاگ پیج، اور ایرر ہینڈلنگ موجود ہے)
-```python
 from flask import Flask, render_template, request, send_file, jsonify
 from flask_cors import CORS
 import subprocess
@@ -10,23 +6,18 @@ import uuid
 import convertapi
 import logging
 
-# لاگنگ (Logging) کو سیٹ اپ کریں تاکہ ایرر آسانی سے نظر آئیں
 logging.basicConfig(level=logging.INFO)
 
-# Flask ایپ کو templates اور static فولڈر کی وضاحت کے ساتھ شروع کریں
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
-# اپنا ConvertAPI Secret یہاں Render کے Environment Variables میں سیٹ کریں
 convertapi.api_secret = os.environ.get('CONVERTAPI_SECRET', 'YOUR_API_SECRET_HERE') 
 
-# عارضی فائلز کے لیے اپلوڈ فولڈر
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# --- فائل کو منفرد نام دینے اور ڈیلیٹ کرنے کے لیے فنکشنز ---
 def get_unique_filepath(file):
     ext = os.path.splitext(file.filename)[1]
     filename = str(uuid.uuid4()) + ext
@@ -40,7 +31,6 @@ def cleanup_files(*args):
             except Exception as e:
                 app.logger.error(f"Error deleting file {file_path}: {e}")
 
-# --- تمام HTML پیجز کو دکھانے والے روٹس ---
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -49,7 +39,6 @@ def home():
 def blog_page():
     return render_template('blog/blogs.html')
 
-# --- بیک اینڈ کنورژن ٹولز کے روٹس ---
 def run_libreoffice_conversion(input_path, output_format, output_dir):
     command = ['libreoffice', '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
     app.logger.info(f"Running command: {' '.join(command)}")
@@ -110,7 +99,6 @@ def pdf_to_word_tool():
 
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_tool():
-    # یہ ٹول بھی ورڈ ٹو پی ڈی ایف کی طرح کام کرے گا
     return word_to_pdf_tool()
 
 @app.route('/pdf-to-excel', methods=['POST'])
