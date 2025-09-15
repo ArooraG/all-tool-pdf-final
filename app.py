@@ -6,15 +6,14 @@ import uuid
 import convertapi
 import logging
 import camelot
+import pandas as pd # Pandas کو امپورٹ کریں
 
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
-# اپنا ConvertAPI کا ٹوکن یہاں لکھیں (یا Render کے Environment Variables میں سیٹ کریں)
-# میں نے آپ کا ٹوکن یہاں ڈال دیا ہے
-convertapi.api_secret = os.environ.get('CONVERTAPI_SECRET', 'JAM5119sgHO2BlfXd1SmFG8MISRZTcKv') 
+convertapi.api_secret = os.environ.get('CONVERTAPI_SECRET') 
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
@@ -51,7 +50,6 @@ def run_libreoffice_conversion(input_path, output_format, output_dir):
     if process.stderr:
         app.logger.error(f"LibreOffice stderr: {process.stderr}")
 
-# 1. Word to PDF
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf_tool():
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
@@ -63,10 +61,14 @@ def word_to_pdf_tool():
         input_path = get_unique_filepath(file)
         file.save(input_path)
         output_dir = app.config['UPLOAD_FOLDER']
+        
         run_libreoffice_conversion(input_path, 'pdf', output_dir)
+        
         pdf_filename = os.path.splitext(os.path.basename(input_path))[0] + '.pdf'
         pdf_filepath = os.path.join(output_dir, pdf_filename)
+        
         if not os.path.exists(pdf_filepath): raise FileNotFoundError("Conversion to PDF failed.")
+        
         return send_file(pdf_filepath, as_attachment=True)
     except Exception as e:
         app.logger.error(f"Word-to-PDF error: {e}")
@@ -74,12 +76,11 @@ def word_to_pdf_tool():
     finally:
         cleanup_files(input_path, pdf_filepath)
 
-# 2. PDF to Word (ConvertAPI کے ذریعے)
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word_tool():
-    if not convertapi.api_secret or "YOUR_API_SECRET_HERE" in convertapi.api_secret:
-        app.logger.error("ConvertAPI Secret is not configured.")
-        return jsonify({"error": "ConvertAPI is not configured on the server."}), 500
+    if not convertapi.api_secret:
+        app.logger.error("ConvertAPI Secret is not configured on the server.")
+        return jsonify({"error": "API Conversion failed: ConvertAPI is not configured on the server."}), 500
 
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
     file = request.files['file']
@@ -89,8 +90,10 @@ def pdf_to_word_tool():
     try:
         input_path = get_unique_filepath(file)
         file.save(input_path)
+        
         result = convertapi.convert('docx', {'File': input_path})
         docx_filepath = result.file.save(app.config['UPLOAD_FOLDER'])
+        
         return send_file(docx_filepath, as_attachment=True)
     except Exception as e:
         app.logger.error(f"PDF-to-Word (API) error: {e}")
@@ -98,12 +101,11 @@ def pdf_to_word_tool():
     finally:
         cleanup_files(input_path, docx_filepath)
 
-# 3. Excel to PDF
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_tool():
     return word_to_pdf_tool()
 
-# 4. PDF to Excel (Camelot لائبریری کے ذریعے)
+# --- PDF to Excel کا نیا اور بہتر کوڈ ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel_tool():
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
@@ -115,26 +117,32 @@ def pdf_to_excel_tool():
         input_path = get_unique_filepath(file)
         file.save(input_path)
         
-        # Camelot کے ذریعے PDF سے ٹیبل نکالیں
-        tables = camelot.read_pdf(input_path, pages='all', flavor='lattice')
+        # Camelot کے ذریعے تمام صفحات سے ٹیبلز نکالیں
+        tables = camelot.read_pdf(input_path, pages='all', flavor='stream')
         
         if tables.n == 0:
-            return jsonify({"error": "No tables found in the PDF."}), 400
+            return jsonify({"error": "No tables found in this PDF file."}), 400
+
+        # تمام ٹیبلز کو ایک لسٹ میں جمع کریں
+        all_dfs = [table.df for table in tables]
+        
+        # Pandas کا استعمال کرکے تمام ٹیبلز کو ایک DataFrame میں جوڑ دیں
+        combined_df = pd.concat(all_dfs, ignore_index=True)
 
         # ایکسل فائل کا نام تیار کریں
         xlsx_filename = os.path.splitext(os.path.basename(input_path))[0] + '.xlsx'
         xlsx_filepath = os.path.join(app.config['UPLOAD_FOLDER'], xlsx_filename)
         
-        # تمام ٹیبلز کو ایک ایکسل فائل میں محفوظ کریں
-        tables.export(xlsx_filepath, f='excel', compress=False)
+        # ایکسل فائل بنائیں جس میں صرف ایک شیٹ ہو اور انڈیکس نمبر نہ ہوں
+        combined_df.to_excel(xlsx_filepath, index=False, header=False, sheet_name='All_Pages_Data')
         
         if not os.path.exists(xlsx_filepath):
-            raise FileNotFoundError("PDF to Excel conversion failed, output file not created.")
+            raise FileNotFoundError("PDF to Excel conversion failed.")
 
         return send_file(xlsx_filepath, as_attachment=True)
     except Exception as e:
         app.logger.error(f"PDF-to-Excel error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Something went wrong during PDF to Excel conversion: {e}"}), 500
     finally:
         cleanup_files(input_path, xlsx_filepath)
         
