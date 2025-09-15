@@ -9,7 +9,7 @@ import logging
 # لاگنگ (Logging) کو سیٹ اپ کریں تاکہ ایرر آسانی سے نظر آئیں
 logging.basicConfig(level=logging.INFO)
 
-# Flask ایپ کو templates اور static فولڈر کی وضاحت کے ساتھ شروع کریں (یہاں تبدیلی کی گئی ہے)
+# Flask ایپ کو templates اور static فولڈر کی وضاحت کے ساتھ شروع کریں
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
@@ -17,9 +17,9 @@ CORS(app)
 convertapi.api_secret = os.environ.get('CONVERTAPI_SECRET', 'YOUR_API_SECRET_HERE') 
 
 # عارضی فائلز کے لیے اپلوڈ فولڈر
+# exist_ok=True شامل کیا گیا ہے تاکہ اگر فولڈر پہلے سے ہو تو ایرر نہ آئے
 UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # --- فائل کو منفرد نام دینے اور ڈیلیٹ کرنے کے لیے فنکشنز ---
@@ -44,6 +44,15 @@ def home():
 @app.route('/blog/blogs.html')
 def blog_page():
     return render_template('blog/blogs.html')
+
+@app.route('/about.html')
+def about_page():
+    return render_template('about.html')
+
+@app.route('/contact.html')
+def contact_page():
+    return render_template('contact.html')
+
 
 # --- بیک اینڈ کنورژن ٹولز کے روٹس ---
 def run_libreoffice_conversion(input_path, output_format, output_dir):
@@ -106,6 +115,7 @@ def pdf_to_word_tool():
 
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_tool():
+    # یہ ٹول بھی ورڈ ٹو پی ڈی ایف کی طرح کام کرے گا
     return word_to_pdf_tool()
 
 @app.route('/pdf-to-excel', methods=['POST'])
