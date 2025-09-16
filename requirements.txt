@@ -1,11 +1,7 @@
-Flask>=2.2,<2.3
-Werkzeug>=2.2,<2.3
-flask-cors
+Flask
+Flask-Cors
 gunicorn
 pandas
-camelot-py[cv]
-opencv-python-headless
-python-docx
-convertapi
-pypdf
+pdfplumber
+pdf2docx
 openpyxl
