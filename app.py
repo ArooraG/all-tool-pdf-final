@@ -10,9 +10,10 @@ from pdf2docx import Converter
 
 # Basic setup
 logging.basicConfig(level=logging.INFO)
-# This line tells Flask where to find the 'index.html' file
 app = Flask(__name__, template_folder='templates')
-CORS(app)
+
+# *** IMPORTANT FIX: This updated CORS configuration gives the server permission to accept files. ***
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Folder to temporarily store uploaded files
 UPLOAD_FOLDER = 'uploads'
@@ -24,7 +25,7 @@ def get_unique_filepath(original_filename):
     """Creates a unique, safe filepath for a file."""
     ext = os.path.splitext(original_filename)[1]
     if not ext:
-        ext = '.tmp' # Add a default extension if none exists
+        ext = '.tmp'
     filename = str(uuid.uuid4()) + ext
     return os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
@@ -45,7 +46,6 @@ def home():
     return render_template('index.html')
 
 # --- Backend Tool Routes ---
-
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel_tool():
     if 'file' not in request.files: return jsonify({"error": "No file part"}), 400
@@ -78,7 +78,7 @@ def pdf_to_excel_tool():
                             df.to_excel(writer, sheet_name=f'Page_{i+1}_Text', index=False, header=False)
         if not os.path.exists(excel_filepath):
              raise FileNotFoundError("Conversion to Excel failed: Output file not created.")
-        return send_file(excel_filepath, as_attachment=True)
+        return send_file(excel_filepath, as_attachment=True, download_name=os.path.basename(excel_filepath))
     except Exception as e:
         app.logger.error(f"PDF-to-Excel error: {e}")
         return jsonify({"error": f"An error occurred during conversion: {e}"}), 500
@@ -101,7 +101,7 @@ def pdf_to_word_tool():
         cv.close()
         if not os.path.exists(docx_path):
              raise FileNotFoundError("Conversion to DOCX failed.")
-        return send_file(docx_path, as_attachment=True)
+        return send_file(docx_path, as_attachment=True, download_name=os.path.basename(docx_path))
     except Exception as e:
         app.logger.error(f"PDF-to-Word error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -125,7 +125,7 @@ def office_to_pdf_tool():
         pdf_filepath = os.path.join(output_dir, pdf_filename)
         if not os.path.exists(pdf_filepath): 
             raise FileNotFoundError("Conversion to PDF failed. Ensure LibreOffice is installed on the server.")
-        return send_file(pdf_filepath, as_attachment=True)
+        return send_file(pdf_filepath, as_attachment=True, download_name=pdf_filename)
     except subprocess.TimeoutExpired:
         app.logger.error("LibreOffice conversion timed out.")
         return jsonify({"error": "The file is too large or complex to convert in time."}), 500
