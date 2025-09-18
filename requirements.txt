@@ -1,7 +1,8 @@
 Flask
 Flask-Cors
-gunicorn
+requests
+python-docx
 pandas
-pdfplumber
-pdf2docx
 openpyxl
+pdfplumber
+gunicorn
