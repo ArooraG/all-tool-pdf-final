@@ -4,5 +4,6 @@ requests
 python-docx
 pandas
 openpyxl
-PyMuPDF  # <-- Isko add karein
+PyMuPDF
 gunicorn
+cloudmersive-convert-api-client # <-- Yeh NAYI line add karein
