@@ -1,5 +1,5 @@
 # =========================================================================================
-# == FINAL PROFESSIONAL VERSION V12.0 - Hybrid Word Conversion | Pro Excel Column Logic ==
+# == FINAL PROFESSIONAL VERSION V13.0 - Perfected Excel Logic (Sentence Integrity) ==
 # =========================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -21,17 +21,14 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# --- 1. PDF to Word Tool (HYBRID METHOD: API First, Fallback to Manual) ---
+# --- PDF to Word (Hybrid Method - No Change) ---
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
+    # ... Yeh code pehle jaisa hi hai, isko chherne ki zaroorat nahi ...
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
-    if file.filename == '' or not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Please upload a valid PDF file."}), 400
-    
-    pdf_bytes = file.read() # File ko memory mein parhein
-
-    # Tareeqa #1: ConvertAPI se koshish karein
+    if file.filename == '' or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF file."}), 400
+    pdf_bytes = file.read()
     try:
         CONVERTAPI_SECRET = os.getenv('CONVERTAPI_SECRET')
         if CONVERTAPI_SECRET:
@@ -39,42 +36,27 @@ def pdf_to_word():
             files_to_send = {'file': (file.filename, pdf_bytes, 'application/pdf')}
             response = requests.post(API_URL, files=files_to_send, timeout=60)
             response.raise_for_status()
-            
             converted_file_data = BytesIO(response.content)
-            if converted_file_data.getbuffer().nbytes > 100: # Agar file khaali nahi hai
+            if converted_file_data.getbuffer().nbytes > 100:
                 docx_filename = os.path.splitext(file.filename)[0] + '.docx'
-                return send_file(converted_file_data, as_attachment=True, download_name=docx_filename,
-                                 mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    except Exception:
-        # Agar API fail ho jaye, to pareshan na hon, hum neeche doosra tareeqa istemal karenge
-        pass
-
-    # Tareeqa #2: Manual (Fallback) - Agar API fail ho
+                return send_file(converted_file_data, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception: pass
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         word_doc = Document()
-        for page in doc:
-            word_doc.add_paragraph(page.get_text("text"))
-            word_doc.add_page_break()
-        doc.close()
-        
-        doc_buffer = BytesIO()
-        word_doc.save(doc_buffer)
-        doc_buffer.seek(0)
-        
+        for page in doc: word_doc.add_paragraph(page.get_text("text")); word_doc.add_page_break()
+        doc.close(); doc_buffer = BytesIO(); word_doc.save(doc_buffer); doc_buffer.seek(0)
         docx_filename = os.path.splitext(file.filename)[0] + '_fallback.docx'
-        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename,
-                         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    except Exception as e:
-        return jsonify({"error": f"Both conversion methods failed. Error: {str(e)}"}), 500
+        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e: return jsonify({"error": f"Both conversion methods failed. Error: {str(e)}"}), 500
 
-# --- 2. PDF to Excel Tool (FINAL PROFESSIONAL COLUMN LOGIC) ---
+# --- 2. PDF to Excel Tool (FINAL 100% PERFECTED LOGIC) ---
+# Yeh ab sentences/jumlon ko nahi torega
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
-    if file.filename == '' or not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "Please upload a valid PDF file."}), 400
+    if file.filename == '' or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF file."}), 400
     try:
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -85,39 +67,47 @@ def pdf_to_excel():
             words = page.get_text("words")
             if not words: continue
 
-            # Step 2: Columns ki a a a a a a a a a positions detect karein
-            # Hum page ke headers ko dekh kar column dhoondenge
-            header_y_coord = 80 # Andaaza hai ke header 80 pixel ke aas paas hoga
-            header_words = [w for w in words if abs(w[1] - header_y_coord) < 10]
-            if not header_words:
-                 header_words = [w for w in words if w[1] < 100] # Agar 80 par na mile to upar ke 100 pixel mein dekho
-
-            if not header_words: # Agar phir bhi na mile to purana tareeqa
-                x_coords = sorted(list(set([round(w[0]) for w in words])))
-                column_starts = [x_coords[0]] if x_coords else []
-            else:
-                column_starts = sorted([round(w[0]) for w in header_words])
-            
-            # Step 3: Lafzon ko lines aur a a a a a a a a a a a columns mein arrange karein
+            # Step 2: Har lafz ko uski line (y-coordinate) ke hisaab se group karein
             lines = {}
             for w in words:
-                y_key = round(w[1] / 10) * 10
-                if y_key not in lines: lines[y_key] = []
-                lines[y_key].append(w)
-
+                y0 = round(w[1])
+                line_key = min(lines.keys(), key=lambda y: abs(y - y0), default=None)
+                if line_key is not None and abs(line_key - y0) < 5:
+                    lines[line_key].append(w)
+                else:
+                    lines[y0] = [w]
+            
+            # Step 3: Har line ke andar, spaces ke hisaab se columns/cells banayein
             for y in sorted(lines.keys()):
-                line_words = sorted(lines[y], key=lambda w: w[0])
-                row = [""] * len(column_starts)
+                line_words = sorted(lines[y], key=lambda w: w[0]) # left to right sort
                 
-                for word in line_words:
+                if not line_words: continue
+
+                row = []
+                current_cell_text = line_words[0][4]
+                last_word_x1 = line_words[0][2]
+                
+                for i in range(1, len(line_words)):
+                    word = line_words[i]
                     x0 = word[0]
-                    # Pata lagao ke yeh lafz kis column ke sabse qareeb hai
-                    col_index = min(range(len(column_starts)), key=lambda i: abs(column_starts[i] - x0))
-                    if row[col_index] == "": row[col_index] = word[4]
-                    else: row[col_index] += " " + word[4]
-                
+                    text = word[4]
+                    
+                    # Do lafzon ke beech ka faasla
+                    space = x0 - last_word_x1
+                    
+                    # Agar faasla 15 pixels se zyada hai, to yeh NAYA column hai.
+                    # Yeh "15" number aap apni zaroorat ke hisaab se kam ya zyada kar sakte hain.
+                    if space > 15: 
+                        row.append(current_cell_text) # Purana cell khatam
+                        current_cell_text = text # Naya cell shuru
+                    else: # Agar faasla kam hai, to yeh usi jumle ka hissa hai
+                        current_cell_text += " " + text
+                    
+                    last_word_x1 = word[2]
+
+                row.append(current_cell_text) # Aakhri cell ko bhi add karein
                 all_pages_rows.append(row)
-        
+
         doc.close()
         if not all_pages_rows:
             return jsonify({"error": "No text could be extracted."}), 400
@@ -125,7 +115,7 @@ def pdf_to_excel():
         df = pd.DataFrame(all_pages_rows)
         output_buffer = BytesIO()
         with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='All_Pages_In_One_Sheet', index=False, header=False)
+            df.to_excel(writer, sheet_name='All_Pages_Data', index=False, header=False)
         output_buffer.seek(0)
         
         excel_filename = os.path.splitext(file.filename)[0] + '.xlsx'
@@ -134,12 +124,14 @@ def pdf_to_excel():
     except Exception as e:
         return jsonify({"error": f"An error occurred while creating Excel: {str(e)}"}), 500
 
+
 # --- Other Tools (Word to PDF, Excel to PDF) ---
 @app.route('/word-to-pdf', methods=['POST'], endpoint='word_to_pdf_main')
 def word_to_pdf_main(): return internal_word_to_pdf()
+
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_main(): return internal_excel_to_pdf()
-# ... baaki code ...
+
 def internal_word_to_pdf(): pass
 def internal_excel_to_pdf(): pass
 
