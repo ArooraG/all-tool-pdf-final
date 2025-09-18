@@ -4,5 +4,5 @@ requests
 python-docx
 pandas
 openpyxl
-pdfplumber
+PyMuPDF  # <-- Isko add karein
 gunicorn
