@@ -6,3 +6,4 @@ openpyxl
 PyMuPDF
 gunicorn
 cloudmersive-convert-api-client
+XlsxWriter
