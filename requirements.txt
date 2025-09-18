@@ -5,6 +5,5 @@ pandas
 openpyxl
 PyMuPDF
 gunicorn
-cloudmersive-convert-api-client
 XlsxWriter
-python-docx 
+# Baaki libraries ki ab zaroorat nahi
