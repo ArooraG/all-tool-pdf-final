@@ -6,4 +6,4 @@ openpyxl
 PyMuPDF
 gunicorn
 XlsxWriter
-statistics
+python-docx
