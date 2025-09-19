@@ -10,3 +10,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.9
+      - key: CONVERTAPI_SECRET
+        value: JAM5119sgHO2BlfXd1SmFG8MISRZTcKv
