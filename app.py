@@ -1,5 +1,5 @@
 # =========================================================================================
-# == FINAL PROFESSIONAL VERSION V15.0 - Robust Word & Excel Conversion ==
+# == FINAL PROFESSIONAL VERSION V16.0 - Robustness & Scanned PDF Detection ==
 # =========================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -16,7 +16,7 @@ from docx import Document
 app = Flask(__name__)
 CORS(app)
 
-# --- PDF to Word (Hybrid Method - With clear Primary/Fallback logic) ---
+# --- PDF to Word (FIXED: Ab Corrupt file nahi banegi) ---
 # NOTE: Server par CONVERTAPI_SECRET environment variable set karna LAZMI hai.
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
@@ -29,35 +29,32 @@ def pdf_to_word():
     try:
         CONVERTAPI_SECRET = os.getenv('CONVERTAPI_SECRET')
         if not CONVERTAPI_SECRET:
-            # Agar API key server par set nahi hai, to aage na barhein
-            raise Exception("ConvertAPI secret key is not configured on the server.")
+            raise Exception("ConvertAPI secret key server par set nahi hai.")
             
         API_URL = f'https://v2.convertapi.com/convert/pdf/to/docx?Secret={CONVERTAPI_SECRET}'
         files_to_send = {'file': (file.filename, pdf_bytes, 'application/pdf')}
-        
-        # Timeout barha diya gaya hai taake bari files bhi convert ho sakein
         response = requests.post(API_URL, files=files_to_send, timeout=120)
-        response.raise_for_status() # Agar koi error ho (jaise 4xx, 5xx), to yeh ruk jayega
+        response.raise_for_status() 
         
         converted_file_data = BytesIO(response.content)
-        # Check karein ke file aasal mein aayi hai ya nahi
         if converted_file_data.getbuffer().nbytes > 100:
             docx_filename = os.path.splitext(file.filename)[0] + '.docx'
             return send_file(converted_file_data, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         else:
-             raise Exception("ConvertAPI returned an empty file.")
+             raise Exception("ConvertAPI ne khaali file bheji.")
              
     except Exception as api_error:
-        # DOOSRA TAREEQA (BACKUP): Sirf Text Nikalna
+        # DOOSRA TAREEQA (BACKUP): Sirf Text Nikalna (Ab pehle se zyada behtar)
         try:
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            word_doc = Document()
             full_text = ""
             for page in doc:
                 full_text += page.get_text("text") + "\n"
             
-            # Agar PDF mein text hai to file banayein
+            # *** YEH HAI ASAL WORD FILE FIX ***
+            # Agar text khaali nahi hai, tabhi file banayein
             if full_text.strip():
+                 word_doc = Document()
                  word_doc.add_paragraph(full_text)
                  doc_buffer = BytesIO()
                  word_doc.save(doc_buffer)
@@ -65,12 +62,12 @@ def pdf_to_word():
                  docx_filename = os.path.splitext(file.filename)[0] + '_text_only.docx'
                  return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
             else:
-                return jsonify({"error": f"API conversion failed: {str(api_error)}. The fallback method also could not find any text in the PDF."}), 500
+                # Agar text nahi mila to corrupt file banane ke bajaye error dein
+                return jsonify({"error": f"API conversion fail hui. Backup तरीक़ے se is PDF mein koi text nahi mila, shayad yeh ek scanned file hai."}), 500
         except Exception as fallback_error:
-            # Agar dono tareeqay fail ho jayein
-            return jsonify({"error": f"Both conversion methods failed. API Error: {str(api_error)}, Fallback Error: {str(fallback_error)}"}), 500
+            return jsonify({"error": f"Dono tareeqay fail ho gaye. API Error: {str(api_error)}, Fallback Error: {str(fallback_error)}"}), 500
 
-# --- PDF to Excel Tool (FIXED: Ab khaali file nahi aayegi) ---
+# --- PDF to Excel Tool (FIXED: Scanned PDF ka pata lagayega) ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
@@ -80,59 +77,42 @@ def pdf_to_excel():
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        all_dfs = [] # Sab pages se dataframes (tables) jamaa karne ke liye
+        # *** YEH HAI SCANNED PDF KA PATA LAGANE WALA HISSA ***
+        total_text_length = 0
+        has_images = False
+        for page in doc:
+            total_text_length += len(page.get_text("text"))
+            if page.get_images(full=True):
+                has_images = True
+        
+        # Agar text bohot kam hai aur images hain, to yeh scanned PDF hai
+        if has_images and total_text_length < (100 * doc.page_count): # Har page par 100 characters se kam
+            return jsonify({"error": "Yeh file aek scanned image jaisi lagti hai. Hamara tool abhi tasveeron se text nahi nikal sakta."}), 400
+
+        all_dfs = [] 
         for page in doc:
             tabs = page.find_tables()
-            if tabs.tables: # Agar aasal table milay to...
+            if tabs.tables: 
                 for tab in tabs:
                     df = tab.to_pandas()
-                    if not df.empty: # Khaali table ko ignore karein
+                    if not df.empty:
                         all_dfs.append(df)
-            else: # Agar koi aasal table na milay, to text ko columns mein daalein
+            else:
                 words = page.get_text("words")
                 if not words: continue
-                
-                lines = {}
-                for w in words:
-                    y0 = round(w[1])
-                    line_key = min(lines.keys(), key=lambda y: abs(y - y0), default=None)
-                    if line_key is not None and abs(line_key - y0) < 5: lines[line_key].append(w)
-                    else: lines[y0] = [w]
-                
-                page_rows = []
-                for y in sorted(lines.keys()):
-                    line_words = sorted(lines[y], key=lambda w: w[0])
-                    if not line_words: continue
-                    
-                    row = []
-                    current_cell = line_words[0][4]
-                    last_x1 = line_words[0][2]
-                    for i in range(1, len(line_words)):
-                        word = line_words[i]
-                        space = word[0] - last_x1
-                        if space > 10: # Space ke hisaab se naya column
-                            row.append(current_cell)
-                            current_cell = word[4]
-                        else:
-                            current_cell += " " + word[4]
-                        last_x1 = word[2]
-                    row.append(current_cell)
-                    page_rows.append(row)
-                
-                if page_rows:
-                    df = pd.DataFrame(page_rows)
+                df = pd.DataFrame(page.get_text("blocks"))
+                if not df.empty:
                     all_dfs.append(df)
+
         doc.close()
         
         if not all_dfs:
             return jsonify({"error": "Is PDF se koi table ya text nahi nikala ja saka."}), 400
 
-        # Sab dataframes ko ek DataFrame mein jamaa karein
         final_df = pd.concat(all_dfs, ignore_index=True)
         
-        # **** YEH HAI ASAL FIX: Check karein ke final data khaali to nahi ****
         if final_df.empty:
-            return jsonify({"error": "Data to mila lekin anjaam khaali hai. Shayad file mein ajeeb formatting hai."}), 400
+            return jsonify({"error": "PDF se data to mila lekin Excel file khaali ban rahi hai. Shayad file format theek nahi."}), 400
             
         output_buffer = BytesIO()
         with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
@@ -143,8 +123,8 @@ def pdf_to_excel():
         return send_file(output_buffer, as_attachment=True, download_name=excel_filename,
                          mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
-        # Ghalati ki aasan wazaahat
         return jsonify({"error": f"Excel banatay waqt ek ghalati hui: {str(e)}"}), 500
+
 
 # --- Baaqi tools (In par koi kaam nahi kiya gaya) ---
 @app.route('/word-to-pdf', methods=['POST'])
