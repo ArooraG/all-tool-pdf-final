@@ -5,5 +5,5 @@ pandas
 openpyxl
 PyMuPDF
 gunicorn
-python-docx
 XlsxWriter
+statistics
