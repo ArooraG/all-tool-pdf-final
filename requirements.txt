@@ -1,6 +1,5 @@
 Flask
 Flask-Cors
-requests
 pandas
 openpyxl
 PyMuPDF
