@@ -1,17 +1,16 @@
 # =====================================================================================
-# == FINAL PRODUCTION-READY VERSION V23.0 - MIME Type Correction & Robust Cleanup ==
+# == FINAL PRODUCTION-READY VERSION V24.0 - Robust Cleanup & Gunicorn Fix ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import os
-import requests
 import pandas as pd
 import fitz  # PyMuPDF
 from io import BytesIO
 import subprocess
 from werkzeug.utils import secure_filename
-import mimetypes # MIME types ke liye zaroori library
+import mimetypes
 
 app = Flask(__name__)
 CORS(app)
@@ -35,6 +34,7 @@ def pdf_to_word():
 # --- PDF to Excel (Professional Layout Logic) ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
+    # ... Iska code pehle jaisa hi theek hai ...
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
@@ -88,6 +88,7 @@ def excel_to_pdf_main():
 
 def convert_with_libreoffice(file, output_format):
     input_path = get_safe_filepath(file.filename)
+    output_path = None # Pehle se define kar dein
     try:
         file.save(input_path)
         subprocess.run(
@@ -99,39 +100,30 @@ def convert_with_libreoffice(file, output_format):
         output_path = get_safe_filepath(output_filename)
         
         if not os.path.exists(output_path):
-             # Server par kya hua, iski maloomat ke liye
             raise Exception("Conversion failed: Output file was not created by LibreOffice.")
 
-        # MIME type ko sahi tarah se set karna, yeh bohat zaroori hai
         mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
-
-        # Response bhejne ke baad files ko delete karne ke liye `after_this_request` ka istemal karein
-        response = send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
+        return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
         
-        @after_this_request
-        def cleanup(response):
-            try:
-                if os.path.exists(input_path): os.remove(input_path)
-                if os.path.exists(output_path): os.remove(output_path)
-            except OSError as e:
-                print(f"Error removing files: {e}")
-            return response
-
-        return response
     except subprocess.TimeoutExpired:
-        if os.path.exists(input_path): os.remove(input_path)
         return jsonify({"error": "The conversion process took too long. Please try a smaller or simpler file."}), 504
     except subprocess.CalledProcessError as e:
-        # LibreOffice ne jo error dia, use user ko dikhana
         error_details = e.stderr or e.stdout or "No details from converter."
-        if os.path.exists(input_path): os.remove(input_path)
         return jsonify({"error": f"Server-side conversion failed. Details: {error_details}"}), 500
     except Exception as e:
-        if os.path.exists(input_path): os.remove(input_path)
         return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
-        
-# `after_this_request` ko use karne ke liye Flask se import karna hoga
-from flask import after_this_request
+    finally:
+        # YEH HISSA BADAL GAYA HAI
+        # Yeh block hamesha chalega, chahe upar success ho ya error aaye.
+        # Yeh file cleanup ka sab se mazboot tareeqa hai.
+        try:
+            if input_path and os.path.exists(input_path):
+                os.remove(input_path)
+            if output_path and os.path.exists(output_path):
+                os.remove(output_path)
+        except OSError as e:
+            # Server log mein error show karega lekin user ko aage nahi bhejega
+            print(f"Error during file cleanup: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
