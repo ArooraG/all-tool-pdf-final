@@ -2,12 +2,11 @@
 # exit on error
 set -o errexit
 
-# Step 1: Install Python dependencies
+# Install Python dependencies first
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Step 2: Install LibreOffice with ALL necessary components
-# Hum 'pdfimport' library aur 'fonts-noto' (jo har zuban ko support karti hai) install kar rahe hain
+# --- Final LibreOffice Installation for Render.com ---
 echo "Updating packages and installing LibreOffice with all dependencies..."
 apt-get update && apt-get install -y \
     libreoffice \
@@ -15,9 +14,11 @@ apt-get update && apt-get install -y \
     fonts-noto \
     && apt-get clean
 
-# Step 3: Set a HOME environment variable. YEH SAB SE ZAROORI HAI.
-# LibreOffice ko headless mode mein chalne ke liye ek writable HOME directory ki zaroorat hoti hai.
-# Iske baghair, woh complex files par aksar silent fail ho jata hai.
-export HOME=/tmp
+# **THE CRITICAL FIX IS HERE**
+# Create a dedicated, writable directory for the LibreOffice user profile.
+# On Render's read-only filesystem, LibreOffice cannot create its config files.
+# This command creates a directory it can actually write to.
+echo "Creating a writable directory for LibreOffice user profile..."
+mkdir -p /opt/render/.config/libreoffice
 
 echo "Build script completed successfully. Environment is ready."

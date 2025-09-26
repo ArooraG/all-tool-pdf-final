@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL PRODUCTION-READY VERSION V26.0 - LibreOffice 7.0 Command Fix ==
+# == FINAL PRODUCTION-READY VERSION V26.0 - LibreOffice Robust Profile Fix ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -23,22 +23,21 @@ def get_safe_filepath(filename):
     safe_filename = secure_filename(filename)
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
-# --- PDF to Word (Using Correct LibreOffice 7.0 Filter Syntax) ---
+# --- PDF to Word (Using LibreOffice with a stable user profile) ---
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    # Sahi tareeqa: filter ko 'convert-to' ke sath ":" laga kar likhein
+    # Use the correct filter for PDF import, passed to the universal converter
     return convert_with_libreoffice(file, "docx:writer_pdf_import")
 
-# --- PDF to Excel ---
+# --- PDF to Excel (This tool uses its own reliable logic) ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
-    # ... (code remains the same)
     try:
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -72,7 +71,7 @@ def pdf_to_excel():
     except Exception as e:
         return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}"}), 500
 
-# --- Universal Converter Function (Final, Corrected Syntax) ---
+# --- Office to PDF Converters ---
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
@@ -87,18 +86,26 @@ def excel_to_pdf_main():
     if not file or not file.filename.lower().endswith(('.xls', '.xlsx')): return jsonify({"error": "Invalid file type. Please upload an Excel file."}), 400
     return convert_with_libreoffice(file, "pdf")
 
+# --- UNIVERSAL CONVERTER FUNCTION (Final, Most Stable Version) ---
 def convert_with_libreoffice(file, output_filter):
     input_path = get_safe_filepath(file.filename)
     output_path = None
     output_dir = os.path.abspath(UPLOAD_FOLDER)
     
-    # Is se output file ka sahi extension pata chalega
+    # ** THE CRITICAL FIX IS HERE **
+    # Explicitly define a writable directory for LibreOffice's user profile.
+    # This prevents silent failures on read-only server environments like Render.
+    user_profile_dir = "-env:UserInstallation=file:///opt/render/.config/libreoffice"
+    
+    # Get the simple extension (e.g., 'pdf', 'docx') from the output_filter
     output_format = output_filter.split(':')[0]
 
     command = [
-        'soffice', '--headless', 
-        '--convert-to', output_filter, 
-        '--outdir', output_dir, 
+        'soffice',
+        user_profile_dir, # <-- CRITICAL FIX APPLIED
+        '--headless',
+        '--convert-to', output_filter,
+        '--outdir', output_dir,
         input_path
     ]
     
@@ -106,17 +113,20 @@ def convert_with_libreoffice(file, output_filter):
         file.save(input_path)
         print(f"Executing command: {' '.join(command)}")
         
+        # Run the command and capture output for better debugging
         result = subprocess.run(command, check=True, timeout=120, capture_output=True, text=True)
 
         print("LibreOffice stdout:", result.stdout)
         print("LibreOffice stderr:", result.stderr)
         
+        # Construct the final output filename
         output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format}'
         output_path = get_safe_filepath(output_filename)
         
         if not os.path.exists(output_path):
             raise Exception("Conversion failed: Output file was not created by LibreOffice.")
 
+        # Correctly guess the MIME type for the response
         mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
         return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
 
@@ -128,9 +138,12 @@ def convert_with_libreoffice(file, output_filter):
         print(f"An unexpected error occurred: {str(e)}")
         return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
     finally:
+        # Use a robust try/except block for cleanup
         try:
-            if input_path and os.path.exists(input_path): os.remove(input_path)
-            if output_path and os.path.exists(output_path): os.remove(output_path)
+            if input_path and os.path.exists(input_path):
+                os.remove(input_path)
+            if output_path and os.path.exists(output_path):
+                os.remove(output_path)
         except OSError as e:
             print(f"Error during file cleanup: {e}")
 
