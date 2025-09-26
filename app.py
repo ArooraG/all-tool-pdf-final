@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V28.0 - Confirmed Base & Simplified Logic ==
+# == FINAL STABLE PRODUCTION VERSION V29.0 - Smart Fallback System ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -11,6 +11,7 @@ from io import BytesIO
 import subprocess
 from werkzeug.utils import secure_filename
 import mimetypes
+from docx import Document # Added for the basic converter
 
 app = Flask(__name__)
 CORS(app)
@@ -23,19 +24,39 @@ def get_safe_filepath(filename):
     safe_filename = secure_filename(filename)
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
-# --- PDF to Word (Final, simplified LibreOffice call) ---
-@app.route('/pdf-to-word', methods=['POST'])
-def pdf_to_word():
+# --- PDF to Word METHOD 1: High-Quality (LibreOffice) ---
+@app.route('/pdf-to-word-premium', methods=['POST'])
+def pdf_to_word_premium():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    # Use the simplest possible command that is confirmed to work with LO 7.0
     return convert_with_libreoffice(file, "docx")
 
-# --- PDF to Excel (This tool uses its own reliable logic) ---
+# --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
+@app.route('/pdf-to-word-basic', methods=['POST'])
+def pdf_to_word_basic():
+    if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
+    file = request.files['file']
+    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
+    try:
+        pdf_bytes = file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        word_doc = Document()
+        for page in doc:
+            word_doc.add_paragraph(page.get_text("text"))
+        doc.close()
+        doc_buffer = BytesIO()
+        word_doc.save(doc_buffer)
+        doc_buffer.seek(0)
+        docx_filename = os.path.splitext(file.filename)[0] + '.docx'
+        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
+
+# --- Other Converters ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
-    # ... (This function remains unchanged as it works well) ...
+    # ... (code remains the same)
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
@@ -72,7 +93,6 @@ def pdf_to_excel():
     except Exception as e:
         return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}"}), 500
 
-# --- Office to PDF Converters ---
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
@@ -87,45 +107,24 @@ def excel_to_pdf_main():
     if not file or not file.filename.lower().endswith(('.xls', '.xlsx')): return jsonify({"error": "Invalid file type. Please upload an Excel file."}), 400
     return convert_with_libreoffice(file, "pdf")
 
-# --- UNIVERSAL CONVERTER FUNCTION (Final, Simple, Stable Version) ---
+# --- Universal LibreOffice Function ---
 def convert_with_libreoffice(file, output_format):
     input_path = get_safe_filepath(file.filename)
     output_path = None
+    # ... (rest of the function remains the same as last time)
     output_dir = os.path.abspath(UPLOAD_FOLDER)
-    
-    # We use the simplest possible command structure, which is the most reliable.
-    # The --infilter and special profile settings are removed as they were causing instability.
-    # The `build.sh` script now prepares the environment so these are not needed.
-    command = [
-        'soffice', '--headless',
-        '--convert-to', output_format,
-        '--outdir', output_dir,
-        input_path
-    ]
-    
+    user_profile = f"-env:UserInstallation=file://{os.path.abspath(UPLOAD_FOLDER)}/libreoffice_profile"
+    command = ['soffice', user_profile, '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
     try:
         file.save(input_path)
-        print(f"Executing command: {' '.join(command)}")
-        
         result = subprocess.run(command, check=True, timeout=120, capture_output=True, text=True)
-        print("LibreOffice stdout:", result.stdout)
-        print("LibreOffice stderr:", result.stderr)
-
-        output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format}'
+        output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format.split(":")[0]}'
         output_path = get_safe_filepath(output_filename)
-        
         if not os.path.exists(output_path):
-            raise Exception("Conversion failed: Output file was not created by LibreOffice.")
-
+            raise Exception("Output file was not created by LibreOffice.")
         mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
         return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
-
-    except subprocess.CalledProcessError as e:
-        error_details = e.stderr or e.stdout or "No detailed error from converter."
-        print(f"LibreOffice failed with error: {error_details}")
-        return jsonify({"error": f"Conversion failed. LibreOffice Error: {error_details}"}), 500
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
         return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
     finally:
         try:
