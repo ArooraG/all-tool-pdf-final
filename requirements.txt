@@ -1,9 +1,8 @@
 Flask
 Flask-Cors
-requests
 pandas
-openpyxl
 PyMuPDF
 gunicorn
-XlsxWriter
-statistics
+requests
+xlsxwriter
+python-docx
