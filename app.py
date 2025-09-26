@@ -1,8 +1,8 @@
 # =====================================================================================
-# == FINAL PRODUCTION-READY VERSION V25.0 - Explicit Command & Detailed Logging ==
+# == FINAL PRODUCTION-READY VERSION V26.0 - LibreOffice 7.0 Command Fix ==
 # =====================================================================================
 
-from flask import Flask, request, send_file, jsonify, after_this_request
+from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import os
 import pandas as pd
@@ -23,20 +23,21 @@ def get_safe_filepath(filename):
     safe_filename = secure_filename(filename)
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
-# --- PDF to Word (Using a more robust LibreOffice command) ---
+# --- PDF to Word (Using Correct LibreOffice 7.0 Filter Syntax) ---
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    # We will specify the docx filter to be more explicit
-    return convert_with_libreoffice(file, "docx", "writer_pdf_import")
+    # Sahi tareeqa: filter ko 'convert-to' ke sath ":" laga kar likhein
+    return convert_with_libreoffice(file, "docx:writer_pdf_import")
 
-# --- PDF to Excel (Remains the same, it's efficient) ---
+# --- PDF to Excel ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
+    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
     # ... (code remains the same)
     try:
         pdf_bytes = file.read()
@@ -71,7 +72,7 @@ def pdf_to_excel():
     except Exception as e:
         return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}"}), 500
 
-# --- Universal Converter Function (Final, Robust Version) ---
+# --- Universal Converter Function (Final, Corrected Syntax) ---
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
@@ -86,30 +87,30 @@ def excel_to_pdf_main():
     if not file or not file.filename.lower().endswith(('.xls', '.xlsx')): return jsonify({"error": "Invalid file type. Please upload an Excel file."}), 400
     return convert_with_libreoffice(file, "pdf")
 
-def convert_with_libreoffice(file, output_format, in_filter=None):
+def convert_with_libreoffice(file, output_filter):
     input_path = get_safe_filepath(file.filename)
     output_path = None
-    output_dir = os.path.abspath(UPLOAD_FOLDER) # Use absolute path for safety
-
-    command = ['soffice', '--headless']
-    # Agar in_filter dia gaya hai (jaise PDF to Word ke liye), to use shamil karein
-    if in_filter:
-        command.extend(['--infilter', in_filter])
+    output_dir = os.path.abspath(UPLOAD_FOLDER)
     
-    command.extend(['--convert-to', output_format, '--outdir', output_dir, input_path])
+    # Is se output file ka sahi extension pata chalega
+    output_format = output_filter.split(':')[0]
+
+    command = [
+        'soffice', '--headless', 
+        '--convert-to', output_filter, 
+        '--outdir', output_dir, 
+        input_path
+    ]
     
     try:
         file.save(input_path)
-        print(f"Executing command: {' '.join(command)}") # Log the exact command
+        print(f"Executing command: {' '.join(command)}")
+        
+        result = subprocess.run(command, check=True, timeout=120, capture_output=True, text=True)
 
-        result = subprocess.run(
-            command,
-            check=True, timeout=120, capture_output=True, text=True
-        )
-
-        print("LibreOffice stdout:", result.stdout) # Log success output
-        print("LibreOffice stderr:", result.stderr) # Log any warnings
-
+        print("LibreOffice stdout:", result.stdout)
+        print("LibreOffice stderr:", result.stderr)
+        
         output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format}'
         output_path = get_safe_filepath(output_filename)
         
@@ -120,20 +121,16 @@ def convert_with_libreoffice(file, output_format, in_filter=None):
         return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
 
     except subprocess.CalledProcessError as e:
-        # Is se humein LibreOffice ka اصل error pata chalega
         error_details = e.stderr or e.stdout or "No detailed error from converter."
-        print(f"LibreOffice failed with error: {error_details}") # Log the detailed error
+        print(f"LibreOffice failed with error: {error_details}")
         return jsonify({"error": f"Server-side conversion failed. Details: {error_details}"}), 500
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}") # Log unexpected errors
+        print(f"An unexpected error occurred: {str(e)}")
         return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
     finally:
-        # Yeh file cleanup ka sab se behtar tareeqa hai
         try:
-            if input_path and os.path.exists(input_path):
-                os.remove(input_path)
-            if output_path and os.path.exists(output_path):
-                os.remove(output_path)
+            if input_path and os.path.exists(input_path): os.remove(input_path)
+            if output_path and os.path.exists(output_path): os.remove(output_path)
         except OSError as e:
             print(f"Error during file cleanup: {e}")
 
