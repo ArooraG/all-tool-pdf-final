@@ -2,18 +2,22 @@
 # exit on error
 set -o errexit
 
-# Install Python dependencies first
+# Step 1: Install Python dependencies
+echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# --- UPGRADED LIBREOFFICE INSTALLATION ---
-# Update package list and install the full version of LibreOffice along with extra fonts.
-# 'libreoffice-l10n-en-gb' helps with language packs.
-# 'fonts-takao-gothic' provides essential Japanese fonts.
-# 'fonts-noto' is a massive font collection from Google covering almost all languages.
-# This makes our converter much more powerful for international documents.
+# Step 2: Install LibreOffice with ALL necessary components
+# Hum 'pdfimport' library aur 'fonts-noto' (jo har zuban ko support karti hai) install kar rahe hain
+echo "Updating packages and installing LibreOffice with all dependencies..."
 apt-get update && apt-get install -y \
     libreoffice \
-    libreoffice-l10n-en-gb \
-    fonts-takao-gothic \
+    libreoffice-pdfimport \
     fonts-noto \
     && apt-get clean
+
+# Step 3: Set a HOME environment variable. YEH SAB SE ZAROORI HAI.
+# LibreOffice ko headless mode mein chalne ke liye ek writable HOME directory ki zaroorat hoti hai.
+# Iske baghair, woh complex files par aksar silent fail ho jata hai.
+export HOME=/tmp
+
+echo "Build script completed successfully. Environment is ready."
