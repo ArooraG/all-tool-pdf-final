@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL PRODUCTION-READY VERSION V20.0 - All Libraries and Logic Stable ==
+# == FINAL PRODUCTION-READY VERSION V21.0 - LibreOffice Fix & Path Correction ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -10,17 +10,23 @@ import pandas as pd
 import fitz  # PyMuPDF
 from io import BytesIO
 import subprocess
+from werkzeug.utils import secure_filename # Yeh zaroori hai
 
 app = Flask(__name__)
 CORS(app) # Allow frontend to talk to backend
 
 UPLOAD_FOLDER = 'uploads'
-# Server start hone par folder check karega
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+# --- Missing Helper Function (Ab Add Kar Diya Hai) ---
+def get_safe_filepath(filename):
+    """Safely combine folder and filename."""
+    # werkzeug se secure_filename istemal karein takay security behtar ho
+    safe_filename = secure_filename(filename)
+    return os.path.join(UPLOAD_FOLDER, safe_filename)
+
 # --- PDF to Word (Manual Fallback Method, No API Needed) ---
-# API keys ka jhanjhat hi khatam
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
     from docx import Document # Isko function ke andar rakha hai to save memory
@@ -46,7 +52,6 @@ def pdf_to_word():
 # --- PDF to Excel (Professional Layout Logic) ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
-    # ... Iska code pehle hi behtareen hai ...
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
@@ -102,18 +107,23 @@ def convert_with_libreoffice(file, output_format):
     input_path = get_safe_filepath(file.filename)
     try:
         file.save(input_path)
-        subprocess.run(['soffice', '--headless', '--convert-to', output_format, '--outdir', UPLOAD_FOLDER, input_path], check=True, timeout=90)
+        # Timeout barha dia gaya hai takay barri files bhi convert ho sakein
+        subprocess.run(['soffice', '--headless', '--convert-to', output_format, '--outdir', UPLOAD_FOLDER, input_path], check=True, timeout=120)
         output_filename = os.path.splitext(file.filename)[0] + f'.{output_format}'
         output_path = get_safe_filepath(output_filename)
-        if not os.path.exists(output_path): raise Exception("Conversion failed on the server.")
+        if not os.path.exists(output_path): raise Exception("Conversion failed on the server. The output file was not created.")
         response = send_file(output_path, as_attachment=True, download_name=output_filename)
-        os.remove(input_path); os.remove(output_path)
+        # Files delete karne se pehle check karein
+        if os.path.exists(input_path): os.remove(input_path)
+        if os.path.exists(output_path): os.remove(output_path)
         return response
+    except subprocess.TimeoutExpired:
+        if os.path.exists(input_path): os.remove(input_path)
+        return jsonify({"error": "The conversion process took too long and was stopped. Please try with a smaller file."}), 504
     except Exception as e:
         if os.path.exists(input_path): os.remove(input_path)
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return jsonify({"error": f"Server conversion error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # Yeh port Render ke liye zaroori hai
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
