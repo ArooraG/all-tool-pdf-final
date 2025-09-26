@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL PRODUCTION-READY VERSION V22.0 - Upgraded PDF to Word Engine ==
+# == FINAL PRODUCTION-READY VERSION V23.0 - MIME Type Correction & Robust Cleanup ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -11,27 +11,25 @@ import fitz  # PyMuPDF
 from io import BytesIO
 import subprocess
 from werkzeug.utils import secure_filename
+import mimetypes # MIME types ke liye zaroori library
 
 app = Flask(__name__)
-CORS(app) # Allow frontend to talk to backend
+CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 def get_safe_filepath(filename):
-    """Safely combine folder and filename."""
     safe_filename = secure_filename(filename)
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
 # --- PDF to Word (UPGRADED TO LIBREOFFICE) ---
 @app.route('/pdf-to-word', methods=['POST'])
 def pdf_to_word():
-    # Pehle wala text-based method hata kar ab hum powerful LibreOffice istemal karenge
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    # Hum wohi function call karenge jo Word se PDF banata hai, lekin ulta
     return convert_with_libreoffice(file, "docx")
 
 # --- PDF to Excel (Professional Layout Logic) ---
@@ -92,32 +90,48 @@ def convert_with_libreoffice(file, output_format):
     input_path = get_safe_filepath(file.filename)
     try:
         file.save(input_path)
-        # Timeout ko 120 seconds kar dia hai, taakay barri files bhi aaram se convert ho jayein
-        subprocess.run(['soffice', '--headless', '--convert-to', output_format, '--outdir', UPLOAD_FOLDER, input_path], check=True, timeout=120)
+        subprocess.run(
+            ['soffice', '--headless', '--convert-to', output_format, '--outdir', UPLOAD_FOLDER, input_path],
+            check=True, timeout=120, capture_output=True, text=True
+        )
         
-        # Output file ka naam ab output_format ke hisab se banega
         output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format}'
         output_path = get_safe_filepath(output_filename)
         
-        if not os.path.exists(output_path): raise Exception("Conversion failed on the server. The output file was not created.")
+        if not os.path.exists(output_path):
+             # Server par kya hua, iski maloomat ke liye
+            raise Exception("Conversion failed: Output file was not created by LibreOffice.")
+
+        # MIME type ko sahi tarah se set karna, yeh bohat zaroori hai
+        mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
+
+        # Response bhejne ke baad files ko delete karne ke liye `after_this_request` ka istemal karein
+        response = send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
         
-        response = send_file(output_path, as_attachment=True, download_name=output_filename)
-        
-        # Response bhejne ke baad files ko delete karein
-        try:
-            if os.path.exists(input_path): os.remove(input_path)
-            if os.path.exists(output_path): os.remove(output_path)
-        except OSError as e:
-            # Agar file delete na ho to error log kar sakte hain, lekin user ko response zaroor mile
-            print(f"Error removing file: {e}")
-            
+        @after_this_request
+        def cleanup(response):
+            try:
+                if os.path.exists(input_path): os.remove(input_path)
+                if os.path.exists(output_path): os.remove(output_path)
+            except OSError as e:
+                print(f"Error removing files: {e}")
+            return response
+
         return response
     except subprocess.TimeoutExpired:
         if os.path.exists(input_path): os.remove(input_path)
-        return jsonify({"error": "The conversion process took too long and was stopped. Please try with a smaller file."}), 504
+        return jsonify({"error": "The conversion process took too long. Please try a smaller or simpler file."}), 504
+    except subprocess.CalledProcessError as e:
+        # LibreOffice ne jo error dia, use user ko dikhana
+        error_details = e.stderr or e.stdout or "No details from converter."
+        if os.path.exists(input_path): os.remove(input_path)
+        return jsonify({"error": f"Server-side conversion failed. Details: {error_details}"}), 500
     except Exception as e:
         if os.path.exists(input_path): os.remove(input_path)
-        return jsonify({"error": f"Server conversion error: {str(e)}"}), 500
+        return jsonify({"error": f"An unexpected server error occurred: {str(e)}"}), 500
+        
+# `after_this_request` ko use karne ke liye Flask se import karna hoga
+from flask import after_this_request
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
