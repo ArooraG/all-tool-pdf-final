@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
    <head>
+       <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Tool PDF</title>
+
+  <!-- Favicon link -->
+  <link rel="icon" type="image/png" href="Favicon.png">
       <meta charset="utf-8"/>
       <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
       <meta content="The ultimate suite of 27 free, secure online PDF tools with AI support. Convert, merge, split, compress, and edit PDF files with detailed guides. No uploads required." name="description"/>
@@ -16,11 +22,12 @@
          #editor-toolbar label{font-weight:500;margin:0 5px 0 0;user-select:none}
          #editor-toolbar select,#editor-toolbar input[type=number]{padding:4px 8px;border-radius:4px;border:1px solid var(--border-color);height:34px}
          #universal-size{width:70px}
-         #editor-toolbar button{padding:6px;border-radius:4px;border:1px solid var(--border-color);background-color:#fff;font-weight:500;font-size:16px;line-height:1;min-width:38px;height:38px;display:flex;justify-content:center;align-items:center}
+         #editor-toolbar button{padding:6px;border-radius:4px;border:1px solid var(--border-color);background-color:#fff;font-weight:500;font-size:16px;line-height:1;min-width:38px;height:38px;display:flex;justify-content:center;align-items:center;gap:4px;}
          #editor-toolbar button svg{width:20px;height:20px;fill:var(--text-dark)}
          #editor-toolbar button.active{background-color:var(--primary-red);border-color:var(--primary-red)}
          #editor-toolbar button.active svg,#editor-toolbar button.active{color:white}
          #editor-toolbar button.active svg{fill:white}
+         #editor-toolbar button:disabled{opacity:0.5;cursor:not-allowed;}
          .font-style-buttons{display:flex;border:1px solid var(--border-color);border-radius:4px;overflow:hidden}
          .font-style-buttons button{font-family:'Times New Roman',Times,serif;min-width:30px;padding:4px 8px;border:none;border-radius:0;border-right:1px solid var(--border-color);height:32px}
          .font-style-buttons button:last-child{border-right:none}
@@ -32,15 +39,21 @@
          #selected-color-view{width:28px;height:28px;border:1px solid #ccc;background-color:#000;cursor:pointer}
          .color-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
          .color-box{width:20px;height:20px;border:1px solid #ccc;cursor:pointer}
-         #text-editor-input{position:absolute;display:none;z-index:20;padding:2px;border:1px dashed var(--primary-red);background:rgba(255,255,255,.9);line-height:1;white-space:nowrap;cursor:move}
-         #pdf-canvas{border:1px solid var(--border-color);border-radius:4px;max-width:100%;height:auto;cursor:default}
+         #text-editor-input{position:absolute;display:none;z-index:20;padding:2px;border:1px dashed var(--primary-red);background:rgba(255,255,255,.9);white-space:nowrap;cursor:move}
+         #canvas-wrapper { position: relative; }
+         #pdf-canvas{border:1px solid var(--border-color);border-radius:4px;max-width:100%;height:auto;cursor:default; position: relative; z-index: 1;}
+         #text-overlays-container { position: absolute; top: 0; left: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
+         .editable-text-overlay { position: absolute; box-sizing: border-box; margin: 0; padding: 0; white-space: pre; color: transparent; background: transparent; border: none; outline: none; display: block; line-height: 1; }
+         #pdf-editor-container.text-edit-mode #text-overlays-container, #pdf-editor-container.text-edit-mode .editable-text-overlay { pointer-events: auto; }
+         #pdf-editor-container.text-edit-mode .editable-text-overlay { cursor: text; }
+         #pdf-editor-container.text-edit-mode .editable-text-overlay:hover { background-color: rgba(0, 123, 255, 0.1); }
+         .editing { pointer-events: auto; outline: 1px dashed var(--primary-red); background-color: rgba(229, 50, 45, 0.05); color: black !important; }
          #editor-pagination{display:none;align-items:center;gap:15px;margin-top:10px}
          #editor-pagination button{padding:8px 16px;background-color:var(--primary-red);color:white;border:none;border-radius:4px;font-weight:600}
          #editor-pagination button:disabled{background-color:#ccc;cursor:not-allowed}
          #page-indicator{font-weight:600}
          fieldset{border:none;padding:0;margin:0;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px}
          fieldset:disabled{opacity:.5;pointer-events:none}
-         
          #delete-pages-viewer { display: none; flex-direction: column; background-color: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); }
          #delete-pages-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; }
          #pdf-file-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
@@ -59,7 +72,6 @@
          #action-menu li { padding: 10px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
          #action-menu li:hover { background-color: #f0f0f0; }
          #action-menu li svg { width: 18px; height: 18px; }
-
          #delete-layout-container { display: flex; gap: 15px; height: 70vh; }
          #page-thumbnails-sidebar { width: 200px; overflow-y: auto; background-color: #f8f8fa; border: 1px solid var(--border-color); border-radius: 5px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
          #main-page-viewer { flex: 1; background-color: #e9e9e9; border-radius: 5px; overflow: auto; padding: 10px; display: flex; justify-content: flex-start; align-items: flex-start; }
@@ -70,10 +82,51 @@
          .thumbnail-item canvas { width: 100%; height: auto; border: 1px solid #ccc; }
          .thumbnail-item .page-number { font-size: 0.9rem; margin-top: 5px; font-weight: 500; }
          .thumbnail-item input[type="checkbox"] { position: absolute; top: 10px; left: 10px; width: 25px; height: 25px; accent-color: black; cursor: pointer; }
-
-
          @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}.reveal{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease}.reveal.active{opacity:1;transform:translateY(0)}@media (max-width:992px){.footer-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}@media (max-width:768px){.nav-menu{display:none}.hamburger{display:block}.footer-grid{grid-template-columns:1fr;text-align:center}.footer-grid .footer-col:first-child{align-items:center;display:flex;flex-direction:column}}@media (max-width:576px){.hero h1{font-size:2.2rem}.modal-tool-title{font-size:1.8rem}#ai-chat-modal{bottom:80px;right:15px}#support-fab{bottom:20px;right:20px}}
+         
+         #pdf-editor-container.text-edit-mode .editable-text-overlay {
+            border: 2px dotted blue !important;
+            cursor: pointer !important;
+            transition: background-color 0.2s;
+         }
+         #pdf-editor-container.text-edit-mode .editable-text-overlay:hover {
+            background-color: rgba(0, 123, 255, 0.15) !important;
+         }
+         #pdf-editor-container.text-edit-mode .editable-text-overlay.editing {
+            border: 1px dashed var(--primary-red) !important;
+            cursor: text !important;
+         }
+
+         /* Styles for Manual PDF to Excel Converter */
+         #mc-container { display: none; text-align: center; }
+         #mc-container h1 { color: #2c3e50; }
+         #mc-manual-converter-container { margin-top: 20px; }
+         #mc-auto-detect-controls { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+         #mc-container .button { background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; margin: 5px; transition: background-color 0.3s ease; }
+         #mc-container .button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+         #mc-container .button:hover:not(:disabled) { background-color: #2980b9; }
+         #mc-canvas-wrapper { position: relative; border: 1px solid #ccc; margin: 20px auto; direction: ltr; user-select: none; }
+         #mc-pdf-canvas, #mc-drawing-canvas { position: absolute; top: 0; left: 0; }
+         #mc-drawing-canvas { z-index: 10; cursor: crosshair; }
+         #mc-page-navigation { margin: 10px 0; display: none; align-items: center; justify-content: center; }
+         #mc-apply-all-label { font-size: 14px; margin-left: 10px; color: #555; }
+         
+         /* New styles for conversion choice */
+         #conversion-choice-container { display: none; text-align: center; padding: 40px 0; }
+         .choice-button { background-color: var(--primary-red); color: white; border: none; padding: 20px 40px; border-radius: 8px; font-size: 1.2rem; cursor: pointer; margin: 10px; transition: background-color 0.3s ease; font-weight: 600; }
+         .choice-button:hover { background-color: var(--primary-red-dark); }
+         .choice-button.secondary { background-color: var(--action-green); }
+         .choice-button.secondary:hover { background-color: var(--action-green-dark); }
       </style>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-T7H17H0THZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-T7H17H0THZ');
+</script>
    </head>
    <body>
       <div id="main-page">
@@ -116,9 +169,9 @@
             </section>
             <section id="tools">
                <div class="container">
-                  <div class="search-bar-container reveal">
+         <div class="search-bar-container reveal">
                      <input id="search-bar" placeholder="?? Search for a tool (e.g., 'merge', 'word', 'sign')..." type="text"/>
-                  </div>
+                 </div>
                   <h2 class="reveal">All PDF Tools</h2>
                   <p class="tools-subtitle reveal">Securely manage your documents with our 27 powerful, browser-based PDF tools. No uploads, no installations, just results.</p>
                   <div class="tools-grid" id="tools-grid"></div>
@@ -138,11 +191,9 @@
                   </a>
                   <p>Your all-in-one solution for PDF management. Free, secure, and entirely client-side.</p>
                   <div class="footer-contact">
-                     <a href="https://wa.me/923356231029" target="_blank" class="whatsapp-link">
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" style="width: 48px; height: 48px;">
-                            <path fill="#25D366" d="M380.9 97.1C346.6 62.8 297.6 42.7 242.3 42.7c-52.9 0-101 20.3-138.6 57.8C66 138.2 46.5 186.2 46.5 238.9c0 23.3 4.2 45.7 12.3 66.8L28.3 440.3l108.9-28.5c20.8 7.5 43.1 11.4 65.1 11.4h.1c55.3 0 106.8-21.4 144.5-59.2C394.3 325 414 274.6 414 221.7c0-54.3-20.7-104.9-53.1-124.6zM242.3 400.3c-20.3 0-40.2-5.5-57.8-15.9l-4.1-2.4-42.9 11.3 11.5-42-2.6-4.3c-11.1-18.4-16.9-39.2-16.9-60.8 0-45 17.5-87.3 49.6-119.3 32.1-32.1 74.4-49.6 119.3-49.6 44.1 0 86.4 17.2 118.5 49.3s49.3 74.4 49.3 118.5c0 47.9-18.8 92.8-52.1 126.1-33.1 33.3-77.9 51.1-125.1 51.1zM196.5 155c-2.3-5.2-4.7-5.3-6.9-5.4-2.2-.1-4.7-.1-7.1-.1-2.4 0-6.3 1.1-9.6 5.4-3.3 4.3-12.7 12.5-12.7 30.5 0 18.1 13 35.3 14.8 37.6 1.8 2.4 25.4 39.9 62.5 55.4 37.1 15.5 37.1 10.3 43.8 9.6 6.7-0.7 20.9-8.5 23.8-16.8 3-8.3 3-15.4 2.1-16.8-1-1.4-3.8-2.3-8-4.3-4.2-2-20.9-10.3-24.1-11.5s-5.6-1.8-8 1.8c-2.4 3.7-9.1 11.5-11.1 13.9-2.1 2.4-4.2 2.6-7.8 1.1-3.6-1.5-15.1-5.5-28.7-17.7-10.7-9.8-17.9-21.9-20-25.6-2.1-3.7-.4-5.6 1.3-7.4 1.7-1.7 3.7-4.3 5.4-6.3 1.7-2 2.3-3.7 3.3-6.1.9-2.5.4-4.7-.2-6.2z"/>
-                         </svg>
-                     </a>
+                   <a href="https://wa.me/923356231029" target="_blank" class="whatsapp-link">
+    <img src="whatsapp-icon.png" alt="Contact on WhatsApp" style="width: 48px; height: 48px; border: 0;">
+</a>
                   </div>
                </div>
                <div class="footer-col"><h4>Convert from PDF</h4><ul><li><a class="footer-tool-link" data-tool="pdf-to-word">PDF to Word</a></li><li><a class="footer-tool-link" data-tool="pdf-to-jpg">PDF to Image (PNG)</a></li><li><a class="footer-tool-link" data-tool="pdf-to-powerpoint">PDF to PowerPoint</a></li><li><a class="footer-tool-link" data-tool="pdf-to-excel">PDF to Excel</a></li></ul></div>
@@ -179,6 +230,40 @@
                <h2 class="modal-tool-title">Tool Title</h2>
                <div class="drop-area" id="drop-area"><input id="file-input" multiple type="file"/><p class="drop-area-text">Drag &amp; drop files here or <br/><span>Click to Select</span></p></div>
                
+                <!-- Container for PDF to Excel choice -->
+                <div id="conversion-choice-container">
+                    <p style="font-size: 1.1rem; color: var(--text-light); margin-bottom: 20px;">How would you like to convert your PDF?</p>
+                    <button id="auto-convert-btn" class="choice-button">Auto Convert</button>
+                    <button id="manual-convert-btn" class="choice-button secondary">Manual Convert</button>
+                </div>
+
+                <!-- Container for Manual PDF to Excel Converter -->
+                <div id="mc-container">
+                    <div id="mc-manual-converter-container">
+                        <div id="mc-auto-detect-controls">
+                             <button id="mc-auto-detect-horizontal" class="button">Auto-detect Horizontal Lines</button>
+                             <button id="mc-auto-detect-vertical" class="button">Auto-detect Vertical Lines</button>
+                             <br>
+                             <input type="checkbox" id="mc-apply-to-all-pages-chk" style="margin-top:15px;">
+                             <label for="mc-apply-to-all-pages-chk" id="mc-apply-all-label">Apply current layout to all pages</label>
+                        </div>
+                        
+                        <div id="mc-page-navigation">
+                            <button id="mc-prev-page" class="button">&lt; Previous</button>
+                            <span style="margin: 0 15px;">Page <span id="mc-page-num"></span> / <span id="mc-page-count"></span></span>
+                            <button id="mc-next-page" class="button">Next &gt;</button>
+                        </div>
+                        <div id="mc-canvas-wrapper">
+                            <canvas id="mc-pdf-canvas"></canvas>
+                            <canvas id="mc-drawing-canvas"></canvas>
+                        </div>
+                        <button id="mc-clear-lines-btn" class="button" style="background-color: #e74c3c;">Clear Lines on This Page</button>
+                        <button id="mc-generate-excel-btn" class="button" style="background-color: #16a085;">Convert</button>
+                    </div>
+                    
+                    <div id="mc-status-container" style="margin-top: 15px;"></div>
+                </div>
+
                <div id="delete-pages-viewer">
                   <div id="delete-pages-toolbar">
                       <span id="pdf-file-name"></span>
@@ -211,10 +296,21 @@
                   <div id="editor-toolbar">
                      <div id="toolbar-top-row">
                         <div class="tool-group">
-                           <button id="select-tool-btn" title="Select"><svg viewBox="0 0 24 24"><path d="M13.62,15.38L12.5,12.5L9.62,13.62L5.5,2.5L18.5,6.5L13.62,15.38M11.1,10.1L12.5,6.5L14.9,7.9L13.5,11.5L11.1,10.1Z"></path></svg></button>
-                           <button id="draw-tool-btn" title="Draw"><svg viewBox="0 0 24 24"><path d="M16.29,3.29L14,5.59L18.41,10L20.71,7.71C21.1,7.32 21.1,6.69 20.71,6.3L17.7,3.29C17.31,2.9 16.68,2.9 16.29,3.29M13,6.59L3,16.59V20H6.41L16.41,10L13,6.59Z"></path></svg></button>
-                           <button id="text-tool-btn" class="active" title="Text"><svg viewBox="0 0 24 24"><path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.17,18 15,18V19H9V18C9.83,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"></path></svg></button>
-                           <button id="erase-tool-btn" title="Erase"><svg viewBox="0 0 24 24"><path d="M16.24,3.56L21.19,8.5C21.58,8.89 21.58,9.5 21.19,9.9L11.9,19.2C11.5,19.6 10.89,19.6 10.5,19.2L5.55,14.26C5.16,13.87 5.16,13.24 5.55,12.85L14.85,3.56C15.24,3.17 15.85,3.17 16.24,3.56M17.31,2.5L14.13,5.68L18.32,9.87L21.5,6.69C22.67,5.52 22.28,3.55 20.93,2.2L17.31,2.5M4.14,13.26L9.09,18.2L2.8,21.95L4.14,13.26Z"></path></svg></button>
+                           <button id="undo-btn" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z"></path></svg></button>
+                           <button id="redo-btn" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M18.4,10.6C16.55,9 14.15,8 11.5,8C6.85,8 2.92,11.03 1.54,15.22L3.9,16C4.95,12.81 7.96,10.5 11.5,10.5C13.46,10.5 15.23,11.22 16.62,12.38L13,16H22V7L18.4,10.6Z"></path></svg></button>
+                        </div>
+                         <div class="tool-group">
+                             <button id="edit-page-text-btn" title="Edit Text" style="min-width: 90px;">
+                                 <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z"></path></svg>
+                                 <span>Edit Text</span>
+                             </button>
+                             <button id="highlight-tool-btn" title="Highlight Area"><svg viewBox="0 0 24 24"><path d="M18.5,1.15C18.23,1.15 17.97,1.26 17.77,1.46L16.27,2.96L19.54,6.23L21.04,4.73C21.43,4.34 21.43,3.71 21.04,3.32L19.18,1.46C18.98,1.26 18.73,1.15 18.5,1.15M15.5,3.73L3,16.23V20H6.77L19.27,7.5L15.5,3.73Z"></path></svg></button>
+                        </div>
+                        <div class="tool-group">
+                           <button id="select-tool-btn" title="Select Tool"><svg viewBox="0 0 24 24"><path d="M13.62,15.38L12.5,12.5L9.62,13.62L5.5,2.5L18.5,6.5L13.62,15.38M11.1,10.1L12.5,6.5L14.9,7.9L13.5,11.5L11.1,10.1Z"></path></svg></button>
+                           <button id="text-tool-btn" class="active" title="Add Text"><svg viewBox="0 0 24 24"><path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.17,18 15,18V19H9V18C9.83,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"></path></svg></button>
+                           <button id="erase-tool-btn" title="Erase Drawings"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M22.8,8.1L22.8,8.1l-5.3-5.3c-0.6-0.6-1.5-0.6-2.1,0L3.5,14.7c-0.2,0.2-0.3,0.4-0.4,0.7l-3,8.9c-0.1,0.4,0,0.8,0.3,1.1C0.7,24.6,1,24.8,1.4,24.8c0.1,0,0.2,0,0.3,0l8.9-3c0.3-0.1,0.5-0.2,0.7-0.4L22.8,10.2C23.4,9.6,23.4,8.7,22.8,8.1z M8.5,20.8l-6.1,2l2-6.1l11-11l4.1,4.1L8.5,20.8z M21.4,8.8l-1.3,1.3l-4.1-4.1l1.3-1.3c0.2-0.2,0.5-0.3,0.8-0.3s0.6,0.1,0.8,0.3l2.5,2.5C21.8,7.9,21.8,8.4,21.4,8.8z" fill="#F4A5B5"></path></svg></button>
+                           <button id="delete-selection-btn" title="Delete Selection"><svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"></path></svg></button>
                         </div>
                         <div class="tool-group">
                            <button id="line-tool-btn" title="Line"><svg viewBox="0 0 24 24"><path d="M22,2L2,22H2V21.59L21.59,2H22M2,3.41L20.59,22H22V20.59L3.41,2H2V3.41Z"></path></svg></button>
@@ -223,25 +319,29 @@
                         </div>
                      </div>
                      <div id="toolbar-bottom-row">
-                        <div class="tool-group">
-                           <label for="font-family">Font:</label>
-                           <select id="font-family">
-                              <option>Arial</option><option>Verdana</option><option>Times New Roman</option><option>Courier New</option><option>sans-serif</option>
-                           </select>
-                        </div>
-                        <div class="tool-group">
-                           <label for="universal-size">Size:</label>
-                           <input type="number" id="universal-size" value="48" min="1">
-                           <div class="font-style-buttons" id="font-style-buttons">
-                              <button id="bold-btn" class="bold" title="Bold">B</button>
-                              <button id="italic-btn" class="italic" title="Italic">I</button>
-                              <button id="underline-btn" class="underline" title="Underline">U</button>
+                        <fieldset id="text-fieldset">
+                           <div class="tool-group">
+                              <label for="font-family">Font:</label>
+                              <select id="font-family">
+                                 <option>Arial</option><option>Verdana</option><option>Times New Roman</option><option>Courier New</option><option>sans-serif</option>
+                              </select>
                            </div>
-                        </div>
-                        <div class="tool-group">
-                           <label for="fill-shape-check">Fill:</label>
-                           <input type="checkbox" id="fill-shape-check" title="Fill Shape">
-                        </div>
+                           <div class="tool-group">
+                              <label for="universal-size">Size:</label>
+                              <input type="number" id="universal-size" value="48" min="1">
+                              <div class="font-style-buttons" id="font-style-buttons">
+                                 <button id="bold-btn" class="bold" title="Bold">B</button>
+                                 <button id="italic-btn" class="italic" title="Italic">I</button>
+                                 <button id="underline-btn" class="underline" title="Underline">U</button>
+                              </div>
+                           </div>
+                        </fieldset>
+                        <fieldset id="shape-fieldset">
+                           <div class="tool-group">
+                              <label for="fill-shape-check">Fill:</label>
+                              <input type="checkbox" id="fill-shape-check" title="Fill Shape">
+                           </div>
+                        </fieldset>
                         <div class="tool-group color-palette-container">
                            <label>Color:</label>
                            <div id="selected-color-view" class="selected-color-view"></div>
@@ -250,7 +350,10 @@
                         </div>
                      </div>
                   </div>
-                  <canvas id="pdf-canvas"></canvas>
+                   <div id="canvas-wrapper">
+                       <canvas id="pdf-canvas"></canvas>
+                       <div id="text-overlays-container"></div>
+                   </div>
                   <input type="text" id="text-editor-input"/>
                   <div id="editor-pagination">
                      <button id="prev-page-btn">Previous Page</button>
@@ -289,32 +392,426 @@
          </div>
       </div>
       <!-- Floating Action Button & AI Chat -->
-      <div id="support-fab" title="Contact Support Team">??</div>
-      <div id="ai-chat-modal" class="hidden"><div class="chat-header"><h4>Support Team</h4><button id="close-chat-btn">&times;</button></div><div class="chat-messages" id="chat-messages-container"><div class="chat-message ai-message">Welcome! How can I help you with your PDFs today?</div></div><form class="chat-form" id="chat-form"><input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off"><button type="submit" id="chat-submit" title="Send">?</button></form></div>
+      <div id="support-fab" title="Contact Support Team">
+         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+      </div>
+      <div id="ai-chat-modal" class="hidden">
+         <div class="chat-header">
+            <h4>Support Team</h4>
+            <button id="close-chat-btn">&times;</button>
+         </div>
+         <div class="chat-messages" id="chat-messages-container">
+            <div class="chat-message ai-message">Welcome! How can I help you with your PDFs today?</div>
+         </div>
+         <form class="chat-form" id="chat-form">
+            <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off">
+            <button type="submit" id="chat-submit" title="Send">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="var(--primary-red)"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+         </form>
+      </div>
       <div class="loader-container" id="loader-container"><div class="loader"></div><p id="loader-text">Processing...</p></div>
       <!-- SEO Blog Content -->
       <div id="all-tool-articles" style="display:none">
-         <div id="article-pdf-to-word"><h3>Free Online PDF to Word Converter</h3><p>Unlock the content within your PDFs by converting them into fully editable Microsoft Word documents (DOCX). Our free <strong>PDF to Word converter</strong> is an essential online PDF tool for students, professionals, and anyone who needs to modify or reuse text from a PDF file. The conversion maintains your original formatting, so you can start editing right away.</p><h4>Key Benefits of Converting PDF to Word</h4><ul><li><strong>Edit with Ease:</strong> Directly edit text, tables, and images from your PDF in a familiar Word interface. Correct typos, update information, or repurpose content without starting from scratch.</li><li><strong>Secure and Private:</strong> Your files are processed in the browser. They are never uploaded to our servers, guaranteeing the privacy of your sensitive documents.</li></ul><h4>How to Convert PDF to Word Online</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Drag and drop your PDF file into the drop area above, or click the button to select a file from your computer.</li><li><strong>Step 2: Start the Conversion:</strong> The tool will automatically begin the process of converting your file from PDF to DOCX format.</li><li><strong>Step 3: Process and Download:</strong> Within seconds, your new, editable Word document will be ready. Click the 'Download' button to save the file to your device.</li></ol></div>
-         <div id="article-pdf-to-jpg"><h3>High-Quality PDF to Image Converter</h3><p>Transform each page of your PDF document into a high-quality PNG image with our <strong>free PDF to Image converter</strong>. This online PDF tool is perfect for when you need to share a document page on social media, embed it in a presentation, or use it in a design project, especially when clarity of text and lines is important. The process is fast, secure, and preserves the visual fidelity of your original file.</p><h4>Why Convert PDF to PNG?</h4><ul><li><strong>Maximum Quality:</strong> PNG is a lossless format, which means it perfectly preserves text, barcodes, and sharp lines without blurriness.</li><li><strong>Easy Sharing:</strong> Images are easier to share on websites, in emails, and on social media platforms.</li><li><strong>Browser-Based Security:</strong> Your PDF is converted directly in your browser. No file uploads mean your data remains completely private.</li></ul><h4>How to Convert PDF to PNG for Free</h4><ol><li><strong>Step 1: Select Your PDF:</strong> Click the upload area to choose the PDF file you wish to convert, or simply drag and drop it.</li><li><strong>Step 2: Let the Tool Work:</strong> Our system will instantly begin converting each page into a separate, high-quality PNG image file.</li><li><strong>Step 3: Download Your Images:</strong> Once complete, download links for each PNG will appear.</li></ol></div>
-         <div id="article-merge-pdf"><h3>Seamlessly Merge PDF Files Online</h3><p>Combine multiple PDF documents into a single, organized file with our powerful and <strong>free Merge PDF tool</strong>. This online utility is perfect for consolidating reports, combining invoices, or creating a single document from various sources. The process is incredibly fast, and because it happens in your browser, your files remain completely secure.</p><h4>Benefits of Using Our Online PDF Merger</h4><ul><li><strong>Improved Organization:</strong> Keep your projects tidy by merging related documents into one file. It's much easier to manage, share, and archive a single PDF.</li><li><strong>Streamlined Workflow:</strong> Save time by combining files with just a few clicks instead of handling multiple attachments.</li><li><strong>Total Security:</strong> Your privacy is our priority. Files are merged directly on your device, not on our servers.</li></ul><h4>How to Merge PDF Files in 3 Simple Steps</h4><ol><li><strong>Step 1: Upload Your PDFs:</strong> Drag and drop all the PDF files you want to combine into the drop zone, or click to select them.</li><li><strong>Step 2: Arrange Your Files:</strong> After uploading, easily reorder the files by dragging them into the correct sequence.</li><li><strong>Step 3: Merge and Download:</strong> Click 'Convert', and a download link for the merged PDF will appear instantly.</li></ol></div>
-         <div id="article-split-pdf"><h3>Easily Split PDF Files Online</h3><p>Our <strong>free Split PDF tool</strong> allows you to extract one or more pages from a PDF or divide a large document into several smaller, more manageable files. Whether you need to separate chapters, isolate a specific report, or reduce file size for sharing, this online PDF tool offers the flexibility you need. The entire process is performed securely in your browser, protecting your data.</p><h4>Why You Should Use a PDF Splitter</h4><ul><li><strong>Extract Key Pages:</strong> Easily pull out specific pages from a large PDF document without needing to keep the entire file.</li><li><strong>Organize Large Documents:</strong> Break down a large manual into separate chapters or sections for easier reading.</li><li><strong>Client-Side Security:</strong> This tool processes your files directly on your computer, ensuring they remain private.</li></ul><h4>How to Split a PDF Online for Free</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Click the upload area or drag and drop the PDF file you want to split.</li><li><strong>Step 2: Define the Page Range:</strong> In the options, specify the exact pages or ranges you want to extract (e.g., '2-5, 8').</li><li><strong>Step 3: Split and Download:</strong> Click 'Convert'. The tool creates a new PDF with only your selected pages, ready for download.</li></ol></div>
-         <div id="article-protect-pdf"><h3>Secure Your Documents with a Password</h3><p>Add a strong layer of security to your sensitive documents with our <strong>free Protect PDF tool</strong>. This utility lets you encrypt your PDF with a password, preventing unauthorized users from opening it. It’s an essential step for sharing confidential information like contracts or reports. Best of all, the entire process happens securely in your browser.</p><h4>Advantages of Password Protecting PDFs</h4><ul><li><strong>Confidentiality Assured:</strong> Ensure that only individuals with the correct password can access your document.</li><li><strong>Prevent Unauthorized Access:</strong> Protect files from being opened by unintended recipients when sent via email.</li><li><strong>Completely Secure Processing:</strong> Your PDF is encrypted directly on your device, never uploaded to our servers.</li></ul><h4>How to Add a Password to a PDF</h4><ol><li><strong>Step 1: Select the PDF File:</strong> Drag and drop your PDF into the upload area or click to select it.</li><li><strong>Step 2: Set a Secure Password:</strong> In the options field, type a strong and unique password.</li><li><strong>Step 3: Encrypt and Download:</strong> Click 'Convert'. Our tool will instantly apply password protection and generate your download.</li></ol></div>
-         <div id="article-word-to-pdf"><h3>Create Professional PDFs from Word</h3><p>Our <strong>free Word to PDF converter</strong> transforms your Microsoft Word documents (.docx, .doc) into high-quality, universally readable PDF files. This is perfect for sending resumes, reports, or invoices in a format that looks professional and cannot be easily altered. Our tool ensures your document's formatting, fonts, and images are perfectly preserved.</p><h4>Why Convert Word to PDF?</h4><ul><li><strong>Universal Compatibility:</strong> PDFs can be opened on any device or operating system and will always look the same.</li><li><strong>Professional Appearance:</strong> Sending a document as a PDF is the standard for professional communication, preventing accidental edits.</li><li><strong>Secure and Private:</strong> Your document is converted right in your browser. It is never sent to our servers, keeping your data safe.</li></ul><h4>How to Convert Word to PDF Online</h4><ol><li><strong>Step 1: Select Your Word File:</strong> Drag and drop your .docx or .doc file into the upload area.</li><li><strong>Step 2: Begin Conversion:</strong> The conversion to a high-quality PDF will start automatically.</li><li><strong>Step 3: Download Your PDF:</strong> Click the download link to save your newly created PDF file.</li></ol></div>
-         <div id="article-excel-to-pdf"><h3>High-Quality Excel to PDF Converter</h3><p>Transform your Excel spreadsheets (.xlsx, .xls) into professional, easy-to-share PDF documents with our <strong>free Excel to PDF converter</strong>. This tool is perfect for creating reports, invoices, or financial summaries that need to be presented in a clean, fixed-layout format. It preserves your tables, charts, and formatting, creating a crisp and clear PDF.</p><h4>Benefits of Converting Excel to PDF</h4><ul><li><strong>Clean Presentation:</strong> Share your data in a clean, non-editable format that is perfect for printing or professional review.</li><li><strong>Data Integrity:</strong> Ensure that formulas, data, and charts cannot be accidentally changed by the recipient.</li><li><strong>Browser-Based Security:</strong> Your spreadsheet never leaves your computer. The entire conversion process happens locally in your browser.</li></ul><h4>How to Convert Excel to PDF for Free</h4><ol><li><strong>Step 1: Upload Your Excel Sheet:</strong> Click the upload area or drag and drop your .xlsx file.</li><li><strong>Step 2: Automatic Conversion:</strong> The tool will automatically process the first sheet in your workbook.</li><li><strong>Step 3: Download the PDF:</strong> Your professional PDF document will be ready to download in seconds.</li></ol></div>
-         <div id="article-jpg-to-pdf"><h3>Combine Images into a PDF</h3><p>Easily merge multiple images (JPG, PNG) into a single, convenient PDF file with our <strong>free Image to PDF converter</strong>. This tool is ideal for creating portfolios, archiving receipts, or compiling visual reports. It automatically formats all pages to a standard size for a professional look.</p><h4>Why Use an Image to PDF Converter?</h4><ul><li><strong>Easy to Share:</strong> Instead of sending multiple image files, send one organized PDF document.</li><li><strong>Portfolio Creation:</strong> A perfect way for photographers and designers to compile their work into one file.</li><li><strong>Private and Secure:</strong> Your images are processed directly in your browser and are never uploaded to our servers.</li></ul><h4>How to Combine Images into a PDF</h4><ol><li><strong>Step 1: Select Your Image Files:</strong> Drag and drop all the images you want to include into the upload area.</li><li><strong>Step 2: Arrange Your Images:</strong> Reorder the images by dragging and dropping them into your preferred sequence.</li><li><strong>Step 3: Convert and Download:</strong> Click the 'Convert' button to merge them into a single PDF, ready for immediate download.</li></ol></div>
-         <div id="article-unlock-pdf"><h3>Remove PDF Password Security</h3><p>If you have a password-protected PDF that you no longer need to secure, our <strong>free Unlock PDF tool</strong> can remove the password protection. You must know the correct password to use this tool. Once unlocked, the file can be opened by anyone without requiring a password, making it easier to share or edit. The process is completely secure and browser-based.</p><h4>Why Unlock a PDF?</h4><ul><li><strong>Convenience:</strong> Remove the hassle of entering a password every time you or a trusted colleague needs to view the file.</li><li><strong>Improved Accessibility:</strong> Make the document easily accessible to a wider audience once it's no longer confidential.</li><li><strong>Client-Side Security:</strong> We do not see your password or your file. The unlocking process happens securely on your own computer.</li></ul><h4>How to Remove a PDF Password</h4><ol><li><strong>Step 1: Upload Your Locked PDF:</strong> Select the password-protected PDF you wish to unlock.</li><li><strong>Step 2: Enter the Current Password:</strong> In the options, provide the correct password for the document.</li><li><strong>Step 3: Unlock and Download:</strong> Click the 'Convert' button. The tool will remove the password and provide a link to download the unlocked PDF.</li></ol></div>
-         <div id="article-rearrange-pages"><h3>Organize PDF by Rearranging Pages</h3><p>Take full control over your documents with our <strong>free Rearrange Pages tool</strong>. This utility allows you to change the order of pages within a PDF, delete unnecessary pages, and create a perfectly organized document. It's an essential tool for cleaning up reports, presentations, or any PDF file before sharing. All organization happens securely in your browser.</p><h4>Key Features</h4><ul><li><strong>Simple Page Reordering:</strong> Easily enter a new sequence for your pages.</li><li><strong>Secure and Fast:</strong> Your file is processed on your device, not on our servers, ensuring speed and total privacy.</li></ul><h4>How to Reorder PDF Pages</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Select the PDF file whose pages you want to organize.</li><li><strong>Step 2: Set New Page Order:</strong> In the options, enter the new sequence of pages (e.g., '3, 1, 5, 2, 4').</li><li><strong>Step 3: Reorganize and Download:</strong> Click the 'Convert' button. A new PDF with the reordered pages will be ready for you to download instantly.</li></ol></div>
-         <div id="article-delete-pdf-pages"><h3>Easily Delete Pages from a PDF</h3><p>Our <strong>free Delete PDF Pages tool</strong> provides a quick and secure way to remove one or more pages from your PDF documents. Whether you need to remove blank pages, irrelevant information, or confidential sections before sharing a file, this tool makes the process effortless. The entire operation is performed in your browser, so your files remain private.</p><h4>Why Delete PDF Pages?</h4><ul><li><strong>Create Concise Documents:</strong> Remove unnecessary pages to make your document shorter and more focused.</li><li><strong>Protect Sensitive Information:</strong> Easily remove pages containing confidential data before distributing a document.</li><li><strong>Client-Side Privacy:</strong> Your PDF is never uploaded. The pages are removed right on your own computer.</li></ul><h4>How to Delete Pages from a PDF</h4><ol><li><strong>Step 1: Upload Your PDF Document:</strong> Drag and drop your file or select it from your device.</li><li><strong>Step 2: Specify Pages to Remove:</strong> In the tool options, enter the page numbers or ranges you want to delete (e.g., '2, 5-7').</li><li><strong>Step 3: Process and Download:</strong> Click the 'Convert' button. The tool will generate a new PDF without the specified pages, ready for download.</li></ol></div>
-         <div id="article-watermark-pdf"><h3>Add a Watermark to Your PDF</h3><p>Protect your documents and assert ownership by adding a text watermark with our <strong>free Watermark PDF tool</strong>. This is perfect for marking files as "Confidential," "Draft," or adding your company's name to your work. The watermark is applied across every page, and the entire process is fast, free, and secure within your browser.</p><h4>Benefits of Adding a Watermark</h4><ul><li><strong>Assert Ownership:</strong> Clearly mark documents with your copyright or company name.</li><li><strong>Indicate Document Status:</strong> Use terms like "DRAFT" or "CONFIDENTIAL" to prevent misuse.</li><li><strong>Secure and Private:</strong> Your files are never uploaded. The watermark is applied locally on your computer.</li></ul><h4>How to Add a Watermark</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Select the document you wish to watermark.</li><li><strong>Step 2: Enter Watermark Text:</strong> In the options, type the text you want to use for the watermark.</li><li><strong>Step 3: Apply and Download:</strong> Click 'Convert'. Your watermarked PDF will be ready to download immediately.</li></ol></div>
-         <div id="article-rotate-pdf"><h3>Rotate PDF Pages Free</h3><p>Correct the orientation of pages in your PDF with our simple and free <strong>Rotate PDF tool</strong>. Whether a page was scanned upside down or you need to switch between portrait and landscape, this tool provides a quick and secure solution directly in your browser.</p><h4>Key Features</h4><ul><li><strong>Flexible Rotation:</strong> Rotate pages 90 degrees clockwise, 90 degrees counter-clockwise (270), or 180 degrees.</li><li><strong>Selective Editing:</strong> Apply rotation to all pages at once or specify only the pages that need correcting (e.g., "2, 5-7").</li><li><strong>Secure and Private:</strong> All rotations happen locally on your device. Your file's content is never seen by us or any third party.</li></ul><h4>How to Rotate a PDF</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Drag and drop your file or click to select it from your device.</li><li><strong>Step 2: Choose Rotation Options:</strong> Select the angle of rotation and enter the page numbers you wish to modify. Leave the page field blank to rotate the entire document.</li><li><strong>Step 3: Apply and Download:</strong> Click the 'Convert' button. The tool will process your request instantly, and your newly rotated PDF will be ready for download.</li></ol></div>
-         <div id="article-edit-pdf"><h3>Visually Edit Your PDF Online</h3><p>Our free <strong>Edit PDF tool</strong> provides a Paint-like interface to visually modify your PDF pages. Draw, annotate, or add text directly onto a preview of your document. It's the perfect way to fill out forms, add notes, or highlight sections before sharing. All editing is done securely in your browser.</p><h4>Key Features</h4><ul><li><strong>Freehand Drawing & Erasing:</strong> Use a brush tool with adjustable size and color to draw or erase anywhere on the page.</li><li><strong>Movable Text Tool:</strong> Add text with custom fonts and sizes, then use the 'Select' tool to drag it to the perfect spot.</li><li><strong>Visual and Intuitive:</strong> Edit your PDF just like you would edit an image, with an interactive canvas.</li></ul><h4>How to Edit a PDF</h4><ol><li><strong>Step 1: Upload Your PDF:</strong> Select the PDF file you want to edit. The first page will be loaded into the editor.</li><li><strong>Step 2: Edit the Page:</strong> Use the toolbar to select a tool (draw, text, erase, select), choose your color, font, and size, and make your changes on the canvas.</li><li><strong>Step 3: Save and Download:</strong> Click the 'Save & Download' button. The tool will apply your edits and provide a link to download the new, modified PDF.</li></ol></div>
-      </div>
-      <div id="ai-chat-responses" style="display:none">
+    <!-- 1. PDF to Excel -->
+    <div id="article-pdf-to-excel">
+        <h3>Free Online PDF to Excel Converter</h3>
+        <p>Unlock the data trapped in your PDF files by converting them into fully editable Microsoft Excel spreadsheets (XLSX). Our <strong>free PDF to Excel converter</strong> is a powerful online tool designed for accuracy, speed, and security. Whether you need to analyze financial reports, extract tables for research, or manage inventory lists, this tool saves you countless hours of manual data entry. The conversion process intelligently recognizes rows and columns to preserve the original table structure as closely as possible, ensuring your data is organized and ready for analysis from the moment you open the file.</p>
+        <h4>Key Benefits of Converting PDF to Excel</h4>
+        <ul>
+            <li><strong>Data Extraction Made Easy:</strong> Pull entire tables from your PDFs directly into an editable Excel format. No more tedious copy-pasting or re-typing complex data.</li>
+            <li><strong>Preserve Table Structure:</strong> Our advanced algorithm works to maintain the original layout of rows and columns, saving you time on reformatting.</li>
+            <li><strong>User-Controlled Accuracy:</strong> For complex tables, the "Manual Convert" option gives you full control. You can draw the rows and columns exactly where you need them to ensure a perfect data extraction every time.</li>
+            <li><strong>Completely Secure:</strong> Your file is processed directly in your browser. It is never uploaded to a server, guaranteeing that your sensitive financial or personal data remains completely private.</li>
+        </ul>
+        <h4>How to Convert PDF to Excel Online</h4>
+        <ol>
+            <li><strong>Step 1: Select Your PDF:</strong> Drag and drop your PDF file into the designated area, or click the button to choose a file from your device.</li>
+            <li><strong>Step 2: Choose Your Method:</strong> After uploading, select "Auto Convert" for a quick, automated conversion, or choose "Manual Convert" to define the table structure yourself for maximum precision.</li>
+            <li><strong>Step 3: Process and Download:</strong> The tool will process your file, and a download link for your new XLSX spreadsheet will appear instantly. Click it to save your file.</li>
+        </ol>
+    </div>
+
+    <!-- 2. Excel to PDF -->
+    <div id="article-excel-to-pdf">
+        <h3>High-Quality Excel to PDF Converter</h3>
+        <p>Transform your Excel spreadsheets (.xlsx, .xls) into professional, easy-to-share PDF documents with our <strong>free Excel to PDF converter</strong>. This online tool is perfect for creating reports, invoices, or financial summaries that need to be presented in a clean, fixed-layout format. It preserves your tables, charts, and formatting, creating a crisp and clear PDF that looks the same on every device. By converting your spreadsheet to PDF, you ensure that your data cannot be easily altered by the recipient, making it the ideal format for official documents.</p>
+        <h4>Why Convert Excel to PDF?</h4>
+        <ul>
+            <li><strong>Professional Presentation:</strong> Share your data in a clean, non-editable format that is perfect for printing, archiving, or professional review.</li>
+            <li><strong>Data Integrity:</strong> Ensure that formulas, data, and charts cannot be accidentally changed by the recipient, maintaining the accuracy of your information.</li>
+            <li><strong>Universal Compatibility:</strong> PDFs are viewable on any operating system without requiring Microsoft Excel, making them easy to share with anyone.</li>
+            <li><strong>Server-Side Power, Total Security:</strong> We use a powerful server with LibreOffice to ensure your formatting is perfectly preserved, while ensuring your file is deleted immediately after conversion.</li>
+        </ul>
+        <h4>How to Convert Excel to PDF for Free</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your Excel Sheet:</strong> Click the upload area or drag and drop your .xlsx or .xls file into the tool.</li>
+            <li><strong>Step 2: High-Quality Conversion:</strong> Our secure server will process your spreadsheet, accurately converting it into a professional-grade PDF document.</li>
+            <li><strong>Step 3: Download Your PDF:</strong> Your new PDF will be ready for download in just a few moments. Click the link to save it to your device.</li>
+        </ol>
+    </div>
+
+    <!-- 3. Word to PDF -->
+    <div id="article-word-to-pdf">
+        <h3>Create Professional PDFs from Word</h3>
+        <p>Our <strong>free Word to PDF converter</strong> transforms your Microsoft Word documents (.docx, .doc) into high-quality, universally readable PDF files. This is perfect for sending resumes, reports, or invoices in a format that looks professional and cannot be easily altered. Our tool ensures your document's formatting, fonts, and images are perfectly preserved, so your final file looks exactly as you intended. PDFs are the professional standard for document sharing, and our tool makes the conversion process effortless and secure.</p>
+        <h4>Why Convert Word to PDF?</h4>
+        <ul>
+            <li><strong>Universal Compatibility:</strong> PDFs can be opened and viewed correctly on any device or operating system, from Windows and Mac to mobile phones, without needing Microsoft Word.</li>
+            <li><strong>Professional Appearance:</strong> Sending a document as a PDF is the standard for business communication, preventing accidental edits and ensuring a polished, consistent look.</li>
+            <li><strong>Secure Server-Side Conversion:</strong> To guarantee the highest fidelity, your document is processed on our secure server using LibreOffice and is immediately deleted after conversion. Your privacy is paramount.</li>
+        </ul>
+        <h4>How to Convert Word to PDF Online</h4>
+        <ol>
+            <li><strong>Step 1: Select Your Word File:</strong> Drag and drop your .docx or .doc file into the upload area or click to select it from your computer.</li>
+            <li><strong>Step 2: Let the Tool Work:</strong> The conversion to a high-quality PDF will begin automatically on our secure server.</li>
+            <li><strong>Step 3: Download Your PDF:</strong> Click the download link that appears to save your newly created PDF file to your device.</li>
+        </ol>
+    </div>
+
+    <!-- 4. PDF to Word -->
+    <div id="article-pdf-to-word">
+        <h3>Free Online PDF to Word Converter</h3>
+        <p>Unlock the content within your PDFs by converting them into fully editable Microsoft Word documents (DOCX). Our free <strong>PDF to Word converter</strong> is an essential online PDF tool for students, professionals, and anyone who needs to modify or reuse text from a PDF file. The conversion extracts text while attempting to maintain your original formatting, allowing you to start editing, correcting, or updating your document in Microsoft Word right away without retyping everything from scratch.</p>
+        <h4>Key Benefits of Converting PDF to Word</h4>
+        <ul>
+            <li><strong>Edit with Ease:</strong> Directly edit text, tables, and paragraphs from your PDF in the familiar Microsoft Word interface. Correct typos, update information, or repurpose content efficiently.</li>
+            <li><strong>Save Valuable Time:</strong> Avoid the time-consuming task of manually re-typing documents. This tool automates the text extraction process in seconds.</li>
+            <li><strong>Secure and Private:</strong> Your files are processed entirely within your browser. They are never uploaded to our servers, guaranteeing the complete privacy and security of your sensitive documents.</li>
+        </ul>
+        <h4>How to Convert PDF to Word Online</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Drag and drop your PDF file into the drop area above, or click the button to select a file from your computer.</li>
+            <li><strong>Step 2: Instant Conversion:</strong> The tool will automatically begin processing your file and extracting the text into a DOCX format.</li>
+            <li><strong>Step 3: Download and Edit:</strong> Within seconds, your new, editable Word document will be ready. Click the 'Download' button to save the file to your device and start editing.</li>
+        </ol>
+    </div>
+
+    <!-- 5 & 6. PDF to PowerPoint & Vice Versa -->
+    <div id="article-pdf-to-powerpoint">
+        <h3>Convert PDF to PowerPoint (Coming Soon)</h3>
+        <p>Our upcoming <strong>PDF to PowerPoint converter</strong> will allow you to transform your PDF documents into fully editable PowerPoint presentations (PPTX). This tool will be perfect for reusing presentation slides, extracting images and text for a new talk, or quickly turning a PDF report into a slideshow. The converter will intelligently analyze each page to convert elements into native PowerPoint shapes, text boxes, and images. This feature is currently in development and will be released soon to provide you with an even more comprehensive suite of tools.</p>
+    </div>
+    <div id="article-powerpoint-to-pdf">
+        <h3>PowerPoint to PDF (Coming Soon)</h3>
+        <p>Soon, you'll be able to convert your PowerPoint presentations (.pptx) into universal PDF files with our <strong>free PowerPoint to PDF converter</strong>. This will be the perfect tool for sharing your presentations in a professional, non-editable format that preserves your fonts, images, and layouts perfectly. PDFs ensure your slideshow looks the same for everyone, regardless of their device or software. This powerful conversion will be handled on our secure server to ensure the highest quality and will be available in a future update. We appreciate your patience as we work to bring you this feature.</p>
+    </div>
+
+    <!-- 7. PDF to Image -->
+    <div id="article-pdf-to-jpg">
+        <h3>High-Quality PDF to Image Converter</h3>
+        <p>Transform each page of your PDF document into a high-quality PNG image with our <strong>free PDF to Image converter</strong>. This online PDF tool is perfect for when you need to share a document page on social media, embed it in a presentation, or use it in a design project. We use the PNG format because it perfectly preserves the sharpness of text and lines, making it superior to JPG for text-based documents. The process is fast, secure, and preserves the visual fidelity of your original file, all without uploading anything to a server.</p>
+        <h4>Why Convert PDF to PNG?</h4>
+        <ul>
+            <li><strong>Maximum Quality for Text:</strong> PNG is a "lossless" format, which means it preserves every detail, including sharp text, barcodes, and intricate lines, without any blurriness.</li>
+            <li><strong>Easy Sharing and Embedding:</strong> Images are simpler to post on websites, in emails, and on social media platforms compared to a full PDF document.</li>
+            <li><strong>Browser-Based Security:</strong> Your PDF is converted directly in your browser. Since there are no file uploads, your data remains completely private and secure on your own computer.</li>
+        </ul>
+        <h4>How to Convert PDF to PNG for Free</h4>
+        <ol>
+            <li><strong>Step 1: Select Your PDF:</strong> Click the upload area to choose the PDF file you wish to convert, or simply drag and drop it into the tool.</li>
+            <li><strong>Step 2: Instant Page Conversion:</strong> Our system will immediately begin converting each page of your PDF into a separate, high-resolution PNG image file.</li>
+            <li><strong>Step 3: Download Your Images:</strong> Once complete, download links for each individual PNG image will appear, ready for you to save to your device.</li>
+        </ol>
+    </div>
+
+    <!-- 8. Image to PDF -->
+    <div id="article-jpg-to-pdf">
+        <h3>Combine Images into a PDF</h3>
+        <p>Easily merge multiple images (JPG, PNG, etc.) into a single, convenient PDF file with our <strong>free Image to PDF converter</strong>. This tool is ideal for creating portfolios, archiving receipts, compiling visual reports, or submitting coursework. It automatically arranges your images into a professional-looking PDF document, with one image per page. You can upload multiple images at once and easily reorder them by dragging and dropping before you convert. The entire process is secure and happens right in your browser.</p>
+        <h4>Why Use an Image to PDF Converter?</h4>
+        <ul>
+            <li><strong>Easy to Share and Archive:</strong> Instead of sending multiple image files as attachments, send one single, organized, and professional PDF document.</li>
+            <li><strong>Create Portfolios and Reports:</strong> A perfect way for photographers, designers, and students to compile their work into one distributable file.</li>
+            <li><strong>Private and Secure:</strong> Your images are processed directly in your browser and are never uploaded to our servers. Your files remain on your computer at all times.</li>
+        </ul>
+        <h4>How to Combine Images into a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Select Your Image Files:</strong> Drag and drop all the images you want to include into the upload area. You can select multiple JPG, PNG, or other image formats.</li>
+            <li><strong>Step 2: Arrange Your Images:</strong> After uploading, simply reorder the images by dragging and dropping them into your preferred sequence for the PDF.</li>
+            <li><strong>Step 3: Convert and Download:</strong> Click the 'Convert' button to merge your images into a single PDF, which will be ready for immediate download.</li>
+        </ol>
+    </div>
+    
+    <!-- 9. HTML to PDF -->
+    <div id="article-html-to-pdf">
+        <h3>Free HTML to PDF Converter</h3>
+        <p>Convert any HTML file or code snippet into a high-quality PDF document with our <strong>free online HTML to PDF converter</strong>. This tool is perfect for archiving web pages, creating printable versions of online articles, or converting your HTML-based invoices into a professional PDF format. It accurately renders the HTML, including CSS styles, to create a PDF that looks just like the web page. The entire conversion happens securely in your browser, so your code and data remain completely private.</p>
+        <h4>Key Features</h4>
+        <ul>
+            <li><strong>Accurate Rendering:</strong> The converter faithfully reproduces your HTML and CSS, preserving layouts, fonts, and colors in the final PDF.</li>
+            <li><strong>Great for Archiving:</strong> Save a permanent, offline copy of any webpage or HTML document in a stable and universally accessible format.</li>
+            <li><strong>Client-Side and Secure:</strong> The conversion process runs entirely on your computer. Your HTML files are not sent to any external server.</li>
+        </ul>
+        <h4>How to Convert HTML to PDF</h4>
+        <ol>
+            <li><strong>Step 1: Select Your HTML File:</strong> Drag and drop your .html file into the tool's drop area, or click to browse and select it from your device.</li>
+            <li><strong>Step 2: Instant Conversion:</strong> The tool immediately begins processing the HTML and rendering it as a PDF document.</li>
+            <li><strong>Step 3: Download Your PDF:</strong> In just a moment, your professionally formatted PDF will be ready. Click the download link to save it.</li>
+        </ol>
+    </div>
+    
+    <!-- 10. PDF to Text -->
+    <div id="article-pdf-to-text">
+        <h3>Extract Text from PDF</h3>
+        <p>Quickly and easily extract all the plain text from your PDF document with our <strong>free PDF to Text converter</strong>. This tool is incredibly useful when you only need the raw text content from a file for editing, analysis, or repurposing, without any of the original formatting or images. It strips away all layouts, fonts, and graphics to provide you with a clean .txt file containing just the textual information. As with all our tools, this process is fast, free, and happens securely within your browser to protect your privacy.</p>
+        <h4>Why Use a PDF to Text Extractor?</h4>
+        <ul>
+            <li><strong>Focus on Content:</strong> Get just the text you need, free from distracting formatting, making it easy to copy and paste into any application.</li>
+            <li><strong>Lightweight and Fast:</strong> The resulting .txt file is extremely small and opens instantly on any device.</li>
+            <li><strong>Data Analysis Ready:</strong> Plain text is the perfect format for input into data analysis tools, programming scripts, or content management systems.</li>
+            <li><strong>Private Processing:</strong> Your PDF is never uploaded. All text extraction is performed locally on your computer.</li>
+        </ul>
+        <h4>How to Extract Text from a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Click the upload area or drag and drop the PDF file you wish to process.</li>
+            <li><strong>Step 2: Automatic Extraction:</strong> The tool will instantly read the PDF and extract all textual content from every page.</li>
+            <li><strong>Step 3: Download the Text File:</strong> A download link for a .txt file containing all the extracted text will be generated immediately.</li>
+        </ol>
+    </div>
+    
+    <!-- 11. Add Page Numbers -->
+    <div id="article-add-page-numbers">
+        <h3>Easily Add Page Numbers to PDF</h3>
+        <p>Organize and professionalize your documents by adding page numbers with our <strong>free online Add Page Numbers tool</strong>. This utility is perfect for academic papers, business reports, legal documents, and any long file where easy navigation is essential. You have full control over the placement, allowing you to position the numbers in the header or footer and align them to the left, center, or right of the page. The entire process is incredibly fast, secure, and happens directly in your browser without uploading your file.</p>
+        <h4>Key Features and Options</h4>
+        <ul>
+            <li><strong>Flexible Positioning:</strong> Choose to place page numbers at the top (header) or bottom (footer) of each page.</li>
+            <li><strong>Custom Alignment:</strong> Align your page numbers to the left, center, or right to match your document's formatting style.</li>
+            <li><strong>Simple and Fast:</strong> The tool applies numbering to all pages of your document with just a few clicks.</li>
+            <li><strong>Secure Client-Side Processing:</strong> Your document's confidentiality is guaranteed as the file is processed locally on your computer, not on our servers.</li>
+        </ul>
+        <h4>How to Add Page Numbers to a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF File:</strong> Drag and drop your document into the tool or click to select it from your device.</li>
+            <li><strong>Step 2: Select Your Options:</strong> Choose the desired position (header/footer) and alignment (left/center/right) for your page numbers from the provided menus.</li>
+            <li><strong>Step 3: Process and Download:</strong> Click the 'Convert' button. The tool will instantly add the page numbers and provide a download link for your newly numbered PDF.</li>
+        </ol>
+    </div>
+    
+    <!-- 12. Delete Pages -->
+    <div id="article-delete-pdf-pages">
+        <h3>Easily Delete Pages from a PDF</h3>
+        <p>Our <strong>free Delete PDF Pages tool</strong> provides a quick, visual, and secure way to remove one or more pages from your PDF documents. Whether you need to remove blank pages, irrelevant information, or confidential sections before sharing a file, this tool makes the process effortless. It features an interactive viewer where you can see thumbnails of all your pages, select the ones you want to remove, and even preview pages in a large viewer before confirming. The entire operation is performed securely in your browser, so your files remain completely private.</p>
+        <h4>Why Delete PDF Pages Online?</h4>
+        <ul>
+            <li><strong>Create Concise Documents:</strong> Remove unnecessary pages to make your document shorter, more focused, and easier for others to read.</li>
+            <li><strong>Protect Sensitive Information:</strong> Easily remove pages containing confidential data before distributing a document to clients or colleagues.</li>
+            <li><strong>Visual and Intuitive Interface:</strong> Select pages to delete by clicking checkboxes on thumbnails. You can click any thumbnail to see a large preview, ensuring you delete the correct pages.</li>
+            <li><strong>Client-Side Privacy:</strong> Your PDF is never uploaded to a server. The pages are processed and removed right on your own computer.</li>
+        </ul>
+        <h4>How to Delete Pages from a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF Document:</strong> Drag and drop your file or select it from your device to load it into the visual editor.</li>
+            <li><strong>Step 2: Select Pages to Remove:</strong> In the left-hand thumbnail sidebar, check the box for each page you wish to delete.</li>
+            <li><strong>Step 3: Process and Download:</strong> Click the 'Delete Selected' button, then click 'Download' to save the new PDF file, which will no longer contain the pages you removed.</li>
+        </ol>
+    </div>
+
+    <!-- 13. Edit PDF -->
+    <div id="article-edit-pdf">
+        <h3>Visually Edit Your PDF Online</h3>
+        <p>Our free <strong>Edit PDF tool</strong> provides an intuitive, Paint-like interface to visually modify your PDF pages. You can draw, annotate, add text, and even edit existing page text directly onto a preview of your document. It's the perfect way to fill out forms, sign documents, add notes, or highlight important sections before sharing. With a comprehensive toolbar, you have full control over fonts, colors, shapes, and more. All editing is done securely and privately in your browser without uploading your files.</p>
+        <h4>Key Editing Features</h4>
+        <ul>
+            <li><strong>Edit Existing Text:</strong> Click the "Edit Text" button to make the text on your original PDF page editable. Correct typos or update information directly.</li>
+            <li><strong>Add New Text & Shapes:</strong> Use the toolbar to add new text boxes, lines, rectangles, and circles. Customize fonts, sizes, colors, and styles.</li>
+            <li><strong>Draw & Highlight:</strong> Use the freehand drawing tool to add signatures or annotations, and the highlight tool to emphasize important areas.</li>
+            <li><strong>Secure and Private:</strong> All modifications happen in your browser. Your confidential document is never sent to our servers.</li>
+        </ul>
+        <h4>How to Edit a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Select the PDF file you want to edit. The first page will load into the interactive editor.</li>
+            <li><strong>Step 2: Edit the Page:</strong> Use the top toolbar to select a tool (Edit Text, Add Text, Draw, Shapes), choose your color, font, and size, and make your changes directly on the canvas.</li>
+            <li><strong>Step 3: Save and Download:</strong> When you are finished editing, click the 'Save & Download' button. The tool will apply all your changes and provide a link to download your modified PDF.</li>
+        </ol>
+    </div>
+
+    <!-- 14. Merge PDF -->
+    <div id="article-merge-pdf">
+        <h3>Seamlessly Merge PDF Files Online</h3>
+        <p>Combine multiple PDF documents into a single, organized file with our powerful and <strong>free Merge PDF tool</strong>. This online utility is perfect for consolidating reports, combining invoices, or creating a single portfolio from various sources. The process is incredibly fast, and because it happens directly in your browser, your files remain completely secure and private. You can upload several files at once and easily rearrange them into the perfect order before combining them into one final document.</p>
+        <h4>Benefits of Using Our Online PDF Merger</h4>
+        <ul>
+            <li><strong>Improved Organization:</strong> Keep your projects tidy by merging related documents into one file. It's much easier to manage, share, and archive a single PDF.</li>
+            <li><strong>Streamlined Workflow:</strong> Save time by combining files with just a few clicks instead of handling multiple email attachments. Drag and drop to reorder files as needed.</li>
+            <li><strong>Total Security and Privacy:</strong> Your privacy is our priority. Files are merged directly on your device, not on our servers, which means your documents are never uploaded.</li>
+        </ul>
+        <h4>How to Merge PDF Files in 3 Simple Steps</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDFs:</strong> Drag and drop all the PDF files you want to combine into the drop zone, or click to select them from your computer.</li>
+            <li><strong>Step 2: Arrange Your Files:</strong> After uploading, easily reorder the files by dragging and dropping them into the correct sequence for your final document.</li>
+            <li><strong>Step 3: Merge and Download:</strong> Click 'Convert', and a download link for the newly merged, single PDF file will appear instantly.</li>
+        </ol>
+    </div>
+
+    <!-- 15. Split PDF -->
+    <div id="article-split-pdf">
+        <h3>Easily Split PDF Files Online</h3>
+        <p>Our <strong>free Split PDF tool</strong> allows you to extract one or more pages from a PDF document or divide a large file into several smaller, more manageable ones. Whether you need to separate chapters from a book, isolate a specific report from a collection, or reduce a file's size for easy sharing, this online PDF tool offers the flexibility you need. Simply specify which pages you want to keep, and the tool will create a new PDF containing only those pages. The entire process is performed securely in your browser, protecting your data.</p>
+        <h4>Why You Should Use a PDF Splitter</h4>
+        <ul>
+            <li><strong>Extract Key Pages:</strong> Easily pull out specific pages or a range of pages (e.g., "2-5, 8, 10-12") from a large PDF document without needing to keep the entire file.</li>
+            <li><strong>Organize Large Documents:</strong> Break down a large manual or report into separate chapters or sections for easier reading and distribution.</li>
+            <li><strong>Client-Side Security:</strong> This tool processes your files directly on your computer. Your PDF is never uploaded to a server, ensuring your information remains private.</li>
+        </ul>
+        <h4>How to Split a PDF Online for Free</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Click the upload area or drag and drop the PDF file from which you want to extract pages.</li>
+            <li><strong>Step 2: Define the Page Range:</strong> In the options, specify the exact pages or ranges you want to extract (for example: '2-5, 8' to get pages 2, 3, 4, 5, and 8).</li>
+            <li><strong>Step 3: Split and Download:</strong> Click 'Convert'. The tool will instantly create a new PDF with only your selected pages, ready for immediate download.</li>
+        </ol>
+    </div>
+
+    <!-- 16. Rearrange Pages -->
+    <div id="article-rearrange-pages">
+        <h3>Organize PDF by Rearranging Pages</h3>
+        <p>Take full control over your documents with our <strong>free Rearrange Pages tool</strong>. This utility allows you to change the order of pages within a PDF, delete unnecessary pages, and create a perfectly organized document without needing any complex software. It's an essential tool for cleaning up scanned documents, organizing reports, or arranging presentation slides before sharing. All organization happens securely in your browser, meaning your file is never uploaded to a server, ensuring both speed and total privacy.</p>
+        <h4>Key Features</h4>
+        <ul>
+            <li><strong>Simple Page Reordering:</strong> Easily specify a new sequence for your pages using a simple, comma-separated format (e.g., '3, 1, 5, 2, 4').</li>
+            <li><strong>Flexible Page Selection:</strong> You can reorder, duplicate, or omit pages as needed to create the perfect document layout.</li>
+            <li><strong>Secure and Fast:</strong> Because the process runs entirely on your computer, it's incredibly fast and completely private. Your file's content is never seen by us.</li>
+        </ul>
+        <h4>How to Reorder PDF Pages</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Select the PDF file whose pages you want to organize by dragging it into the tool.</li>
+            <li><strong>Step 2: Set New Page Order:</strong> In the options box, enter the new sequence of pages (e.g., to make page 3 the first page, you would start with '3, ...').</li>
+            <li><strong>Step 3: Reorganize and Download:</strong> Click the 'Convert' button. A new PDF with the pages in your specified order will be ready for you to download instantly.</li>
+        </ol>
+    </div>
+    
+    <!-- 17. Compress PDF -->
+    <div id="article-compress-pdf">
+        <h3>Compress PDF to Reduce File Size</h3>
+        <p>Reduce the size of your PDF files quickly and easily with our <strong>free online PDF compressor</strong>. Large PDFs can be difficult to share via email or upload to websites. This tool helps solve that problem by optimizing your file to reduce its size while maintaining the best possible quality. Our compressor uses basic optimization techniques that work directly in your browser, so you don't have to upload your confidential files to a server. It's the perfect way to make your PDFs more manageable for sharing and storage.</p>
+        <h4>Why Compress Your PDFs?</h4>
+        <ul>
+            <li><strong>Easier Sharing:</strong> Smaller files are faster to email and are less likely to be rejected by attachment size limits.</li>
+            <li><strong>Faster Uploads:</strong> Reduce the time it takes to upload your documents to web portals, cloud storage, or online forms.</li>
+            <li><strong>Save Storage Space:</strong> Keep your hard drive or cloud storage tidy by reducing the space your archived documents take up.</li>
+            <li><strong>Secure, In-Browser Processing:</strong> Your PDF is compressed locally on your own computer, guaranteeing that your document's privacy is fully protected.</li>
+        </ul>
+        <h4>How to Compress a PDF Online</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Drag and drop the large PDF file you want to compress into the designated area.</li>
+            <li><strong>Step 2: Automatic Compression:</strong> The tool will automatically apply a standard level of compression to reduce the file size.</li>
+            <li><strong>Step 3: Download Your Smaller File:</strong> A download link for your newly compressed, smaller PDF will be ready in seconds.</li>
+        </ol>
+    </div>
+    
+    <!-- 18. Rotate PDF -->
+    <div id="article-rotate-pdf">
+        <h3>Rotate PDF Pages Free</h3>
+        <p>Correct the orientation of pages in your PDF with our simple and free <strong>Rotate PDF tool</strong>. Whether a page was scanned upside down, sideways, or you just need to switch between portrait and landscape, this tool provides a quick and secure solution directly in your browser. You can choose to rotate all pages in the document at once or apply the rotation to specific pages only, giving you complete control over your final file. The entire process happens locally on your computer, so your file's privacy is always maintained.</p>
+        <h4>Key Features</h4>
+        <ul>
+            <li><strong>Flexible Rotation:</strong> Rotate pages 90 degrees clockwise, 90 degrees counter-clockwise (270 degrees), or a full 180 degrees to fix any orientation issue.</li>
+            <li><strong>Selective Editing:</strong> Apply the rotation to all pages simultaneously or specify only the pages that need correcting by number (e.g., "2, 5-7").</li>
+            <li><strong>Secure and Private Processing:</strong> All rotations happen on your device. Your file's content is never uploaded to our servers or seen by any third party.</li>
+        </ul>
+        <h4>How to Rotate a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Drag and drop your file or click to select it from your device.</li>
+            <li><strong>Step 2: Choose Rotation Options:</strong> Select the desired angle of rotation and, if needed, enter the page numbers you wish to modify. Leave the page field blank to rotate the entire document.</li>
+            <li><strong>Step 3: Apply and Download:</strong> Click the 'Convert' button. The tool will process your request instantly, and your newly rotated PDF will be ready for download.</li>
+        </ol>
+    </div>
+
+    <!-- 19. Protect PDF -->
+    <div id="article-protect-pdf">
+        <h3>Secure Your Documents with a Password</h3>
+        <p>Add a strong layer of security to your sensitive documents with our <strong>free Protect PDF tool</strong>. This utility lets you encrypt your PDF with a password, preventing unauthorized users from opening and viewing its contents. It’s an essential step for sharing confidential information like contracts, financial reports, or personal records. Best of all, the entire encryption process happens securely in your browser, so your unencrypted file and your password are never sent to our servers, ensuring maximum privacy.</p>
+        <h4>Advantages of Password Protecting PDFs</h4>
+        <ul>
+            <li><strong>Confidentiality Assured:</strong> Ensure that only individuals who have the correct password can access the information within your document.</li>
+            <li><strong>Prevent Unauthorized Access:</strong> Protect files from being opened by unintended recipients when sent via email or stored on shared drives.</li>
+            <li><strong>Completely Secure Browser-Based Processing:</strong> Your PDF is encrypted directly on your device. We never see your password or your file.</li>
+        </ul>
+        <h4>How to Add a Password to a PDF</h4>
+        <ol>
+            <li><strong>Step 1: Select the PDF File:</strong> Drag and drop your PDF into the upload area or click to select it from your computer.</li>
+            <li><strong>Step 2: Set a Secure Password:</strong> In the options field, type a strong and unique password that you will share with authorized viewers.</li>
+            <li><strong>Step 3: Encrypt and Download:</strong> Click 'Convert'. Our tool will instantly apply strong password protection and provide you with a download link for the newly secured PDF.</li>
+        </ol>
+    </div>
+
+    <!-- 20. Unlock PDF -->
+    <div id="article-unlock-pdf">
+        <h3>Remove PDF Password Security</h3>
+        <p>If you have a password-protected PDF that you no longer need to secure, our <strong>free Unlock PDF tool</strong> can remove the open password. You must know the correct password to use this tool, as it is designed for owners of a document, not for cracking unknown passwords. Once unlocked, the file can be opened by anyone without requiring a password, making it easier to share, edit, or archive. The entire process is completely secure and performed in your browser to protect your data and password.</p>
+        <h4>Why Unlock a PDF?</h4>
+        <ul>
+            <li><strong>Convenience and Accessibility:</strong> Remove the hassle of entering a password every time you or a trusted colleague needs to view the file.</li>
+            <li><strong>Improve Workflow:</strong> Allow other automated tools or processes (like indexing or printing) to access the file without manual intervention.</li>
+            <li><strong>Client-Side Security:</strong> We do not see your password or your file. The unlocking process happens securely on your own computer.</li>
+        </ul>
+        <h4>How to Remove a PDF Password</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your Locked PDF:</strong> Select the password-protected PDF you wish to unlock.</li>
+            <li><strong>Step 2: Enter the Current Password:</strong> In the tool's options, provide the correct, current password for the document. This is required for decryption.</li>
+            <li><strong>Step 3: Unlock and Download:</strong> Click the 'Convert' button. The tool will remove the password protection and provide a link to download the new, unlocked PDF file.</li>
+        </ol>
+    </div>
+
+    <!-- 21 & 22. OCR & Searchable PDF -->
+    <div id="article-ocr-pdf">
+        <h3>OCR PDF to Extract Text</h3>
+        <p>Unlock the text from scanned documents, images, and non-selectable PDFs with our powerful <strong>free OCR PDF tool</strong>. OCR (Optical Character Recognition) technology scans your file for recognizable letters and words, converting them into editable plain text. This is essential for digitizing old documents, extracting information from a photo of a page, or making a scanned contract's content copyable. The process can take a few moments but is highly accurate and provides you with a clean text file of the contents.</p>
+    </div>
+    <div id="article-searchable-pdf">
+        <h3>Create Searchable PDF</h3>
+        <p>Convert your flat, image-based PDFs into fully searchable documents with our <strong>Searchable PDF tool</strong>. This tool uses OCR (Optical Character Recognition) technology to create an invisible text layer on top of your original scanned document. This means your PDF will look exactly the same, but you will now be able to search for words using Ctrl+F (or Cmd+F), and you can select and copy text just like a regular document. This is crucial for archiving, research, and making large scanned files easy to navigate. The OCR process happens on your device to ensure privacy.</p>
+    </div>
+    
+    <!-- 23. PDF/A -->
+    <div id="article-pdf-to-pdfa">
+        <h3>PDF to PDF/A (Coming Soon)</h3>
+        <p>Our upcoming <strong>PDF to PDF/A converter</strong> will allow you to convert your standard PDFs into the PDF/A format, the international standard for long-term archiving of electronic documents. The PDF/A format ensures that your document will look exactly the same for years to come, regardless of future changes in software or technology, by embedding all necessary information like fonts directly into the file. This tool will be essential for legal, academic, and government institutions that require documents to be preserved for the long term. This feature is in development and will be released soon.</p>
+    </div>
+    
+    <!-- 24. eSign -->
+    <div id="article-esign-pdf">
+        <h3>eSign PDF Online</h3>
+        <p>Sign your PDF documents electronically with our easy-to-use and <strong>free eSign PDF tool</strong>. Whether you need to sign a contract, an application form, or an invoice, our tool allows you to apply a digital signature without ever printing the document. You can upload an image of your signature (like a transparent .png file) and place it anywhere on the page. This method is fast, eco-friendly, and perfect for modern digital workflows. Your document's security is guaranteed as the process happens in your browser.</p>
+    </div>
+    
+    <!-- 25. Repair PDF -->
+    <div id="article-repair-pdf">
+        <h3>Repair PDF</h3>
+        <p>Attempt to fix and recover a corrupted or damaged PDF file with our <strong>free Repair PDF tool</strong>. A PDF can become corrupted for many reasons, often showing errors like "The file is damaged and could not be repaired." This tool tries to rebuild the internal structure of the PDF to recover as much data as possible. While success is not always guaranteed, it can often restore access to important documents that would otherwise be lost. The process is automated and secure, running in your browser to protect the contents of your file.</p>
+    </div>
+    
+    <!-- 26. Edit Metadata -->
+    <div id="article-edit-pdf-metadata">
+        <h3>Edit PDF Metadata</h3>
+        <p>View and edit the metadata of your PDF files with our simple and <strong>free Edit PDF Metadata tool</strong>. Metadata is the hidden information stored within a file, such as the Title, Author, Subject, and Keywords. This tool is perfect for updating document properties to be more accurate, removing personal information before sharing, or optimizing your PDFs for search engines (SEO) by adding relevant keywords. You have full control over the key metadata fields, and the changes are applied instantly in your browser for maximum privacy.</p>
+    </div>
+    
+    <!-- 27. Watermark -->
+    <div id="article-watermark-pdf">
+        <h3>Add a Watermark to Your PDF</h3>
+        <p>Protect your documents and assert ownership by adding a text watermark with our <strong>free Watermark PDF tool</strong>. This is perfect for marking files as "Confidential," "Draft," "Copyrighted," or adding your company's name to your work. The watermark is applied diagonally across every page of the document, making it visible but not distracting from the main content. The entire process is fast, free, and performed securely within your browser, which means your original file is never uploaded to a server.</p>
+        <h4>Benefits of Adding a Watermark</h4>
+        <ul>
+            <li><strong>Assert Ownership & Copyright:</strong> Clearly mark documents with your brand or company name to discourage unauthorized use.</li>
+            <li><strong>Indicate Document Status:</strong> Use terms like "DRAFT," "CONFIDENTIAL," or "SAMPLE" to prevent misuse and manage document versions.</li>
+            <li><strong>Secure and Private:</strong> Your files are never uploaded. The watermark is applied locally on your own computer, keeping your information safe.</li>
+        </ul>
+        <h4>How to Add a Watermark</h4>
+        <ol>
+            <li><strong>Step 1: Upload Your PDF:</strong> Select the document you wish to watermark by dragging it into the tool.</li>
+            <li><strong>Step 2: Enter Watermark Text:</strong> In the options, type the text you want to use for the watermark (e.g., "CONFIDENTIAL").</li>
+            <li><strong>Step 3: Apply and Download:</strong> Click 'Convert'. Your new, watermarked PDF will be ready to download immediately.</li>
+        </ol>
+    </div>
+</div>
+ <div id="ai-chat-responses" style="display:none">
          <div data-keywords="merge,combine,join">To combine files, our 'Merge PDF' tool is perfect. Just upload your PDFs, put them in order, and you're set!</div>
          <div data-keywords="split,extract,separate">Sounds like you need the 'Split PDF' tool. You can use it to pull out specific pages or ranges from your file in just a few clicks.</div>
          <div data-keywords="password,protect,secure,encrypt">Absolutely. To add a password, head over to the 'Protect PDF' tool. It’s a fast way to keep your file secure.</div>
          <div data-keywords="unlock,remove password">If you have a password-protected file, our 'Unlock PDF' tool can help. You will need to know the current password to remove it.</div>
-         <div data-keywords="word,docx">Yep, you can use the 'Word to PDF' tool to convert DOCX files, or 'PDF to Word' to go the other way. Both are fast and secure.</div>
+         <div data-keywords="word,docx">Yep, you can use the 'Word to PDF' to convert DOCX files, or 'PDF to Word' to go the other way. Both are fast and secure.</div>
          <div data-keywords="jpg,image,png">We have two tools for that! Use 'Image to PDF' to combine images into one file, or 'PDF to Image' to turn a PDF page into a high-quality PNG image.</div>
          <div data-keywords="safe,privacy,upload,security">We take your privacy very seriously. All processing is done in your browser, so your files are never uploaded to any server. They stay with you.</div>
          <div data-keywords="why use,free">Our tools are designed to be fast, free, and completely private. Everything happens right in your browser, so your files are always secure and there are no hidden costs.</div>
@@ -422,9 +919,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
             
-                // Assuming your Flask app is running locally on port 10000.
-                // CHANGE THIS URL IF YOU DEPLOY YOUR BACKEND SOMEWHERE ELSE.
-                const backendUrl = `http://127.0.0.1:10000/${toolEndpoint}`;
+                const backendUrl = `https://all-tool-pdf-final.onrender.com/${toolEndpoint}`;
             
                 try {
                     showLoader('Processing with high-quality server...');
@@ -434,7 +929,7 @@
                     });
             
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ error: 'An unknown server error occurred.' }));
+                        const errorData = await response.json().catch(() => ({ error: 'An unknown server error occurred. The server might be busy or the file format is not supported.' }));
                         throw new Error(errorData.error || `Server error: ${response.status}`);
                     }
             
@@ -445,6 +940,11 @@
                     if (contentDisposition) {
                         const match = contentDisposition.match(/filename="?([^"]+)"?/i);
                         if (match && match.length > 1) finalFileName = match[1];
+                    } else {
+                       const baseName = file.name.substring(0, file.name.lastIndexOf('.') > -1 ? file.name.lastIndexOf('.') : file.name.length);
+                       if (toolEndpoint === 'pdf-to-word') finalFileName = `${baseName}.docx`;
+                       else if (toolEndpoint === 'pdf-to-excel') finalFileName = `${baseName}.xlsx`;
+                       else finalFileName = `${baseName}.pdf`;
                     }
                     
                     outputArea.innerHTML = '';
@@ -457,12 +957,234 @@
                     processBtn.style.display = 'none';
                 }
             };
+
+            // --- MANUAL PDF TO EXCEL CONVERTER LOGIC ---
+            function initManualPdfToExcelConverter(file) {
+                const container = document.getElementById('mc-container');
+                const choiceContainer = document.getElementById('conversion-choice-container');
+                choiceContainer.style.display = 'none';
+                container.style.display = 'block';
+
+                const drawingCanvas = document.getElementById('mc-drawing-canvas');
+                const drawingCtx = drawingCanvas.getContext('2d');
+                const statusContainer = document.getElementById('mc-status-container');
+                
+                let pdfDoc = null, totalPages = 0, currentPageNum = 1;
+                let pageLayouts = {}; 
+                let isMouseDown = false, isDragging = false;
+                let selectedLine = null, hoveredLine = null;
+                let startPos = { x: 0, y: 0 };
+                const DRAG_SENSITIVITY = 8, DRAG_THRESHOLD = 5;
+
+                // --- Event Listeners Setup ---
+                document.getElementById('mc-clear-lines-btn').addEventListener('click', clearCurrentPageLines);
+                document.getElementById('mc-generate-excel-btn').addEventListener('click', generateExcelFromAllPages);
+                document.getElementById('mc-auto-detect-horizontal').addEventListener('click', () => autoDetectLines('horizontal'));
+                document.getElementById('mc-auto-detect-vertical').addEventListener('click', () => autoDetectLines('vertical'));
+                document.getElementById('mc-prev-page').addEventListener('click', showPrevPage);
+                document.getElementById('mc-next-page').addEventListener('click', showNextPage);
+                document.getElementById('mc-apply-to-all-pages-chk').addEventListener('change', syncLayouts);
+                
+                drawingCanvas.addEventListener('contextmenu', handleRightClick);
+                drawingCanvas.addEventListener('dblclick', handleDoubleClick);
+                drawingCanvas.addEventListener('mousedown', startInteraction);
+                drawingCanvas.addEventListener('mousemove', handleMouseMove);
+                drawingCanvas.addEventListener('mouseup', endInteraction);
+                drawingCanvas.addEventListener('mouseleave', () => { isMouseDown = false; isDragging = false; selectedLine = null; hoveredLine = null; redrawAllLines(); drawingCanvas.style.cursor = 'crosshair'; });
+
+                // --- INTERACTION LOGIC ---
+                function handleRightClick(e) {
+                    e.preventDefault();
+                    const pos = getMousePos(e);
+                    const margin = 50; 
+                    if (pos.y < margin || pos.y > drawingCanvas.height - margin) {
+                        addNewLine('vertical', pos);
+                    } else {
+                        addNewLine('horizontal', pos);
+                    }
+                }
+
+                function handleDoubleClick(e) {
+                    const pos = getMousePos(e);
+                    const lineToDelete = getLineAtPos(pos);
+                    if (lineToDelete) {
+                        deleteLine(lineToDelete);
+                        redrawAllLines();
+                    }
+                }
+
+                function startInteraction(e) {
+                    if (e.button !== 0) return; 
+                    const pos = getMousePos(e);
+                    isMouseDown = true;
+                    isDragging = false;
+                    startPos = pos;
+                    selectedLine = getLineAtPos(pos);
+                    redrawAllLines();
+                }
+                
+                function handleMouseMove(e) {
+                    const pos = getMousePos(e);
+                    if (isMouseDown && selectedLine) {
+                        if (!isDragging && Math.hypot(pos.x - startPos.x, pos.y - startPos.y) > DRAG_THRESHOLD) {
+                            isDragging = true;
+                            hoveredLine = null;
+                        }
+                        if (isDragging) {
+                            if (selectedLine.type === 'h') selectedLine.line.y = pos.y;
+                            else selectedLine.line.x = pos.x;
+                            redrawAllLines();
+                        }
+                    } else if (!isMouseDown) {
+                        hoveredLine = getLineAtPos(pos);
+                        drawingCanvas.style.cursor = hoveredLine ? (hoveredLine.type === 'h' ? 'ns-resize' : 'ew-resize') : 'crosshair';
+                        redrawAllLines();
+                    }
+                }
+
+                function endInteraction(e) {
+                    isMouseDown = false;
+                    isDragging = false;
+                    selectedLine = null;
+                    redrawAllLines();
+                }
+                
+                async function handleFileSelect(selectedFile) {
+                    if (!selectedFile) return;
+                    statusContainer.innerHTML = '<p>Loading file...</p>';
+                    const typedarray = new Uint8Array(await readFileAsArrayBuffer(selectedFile));
+                    pdfDoc = await pdfjsLib.getDocument(typedarray).promise;
+                    totalPages = pdfDoc.numPages; currentPageNum = 1;
+                    pageLayouts = {}; for (let i = 1; i <= totalPages; i++) { pageLayouts[i] = { h: [], v: [] }; }
+                    document.getElementById('mc-page-navigation').style.display = 'flex';
+                    document.getElementById('mc-page-count').textContent = totalPages;
+                    await renderPage(currentPageNum);
+                    statusContainer.innerHTML = '';
+                }
+                
+                async function renderPage(pageNum) {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const scale = 1.5; const viewport = page.getViewport({ scale });
+                    const pdfCanvas = document.getElementById('mc-pdf-canvas');
+                    const pdfCtx = pdfCanvas.getContext('2d');
+                    setupCanvas(viewport.width, viewport.height);
+                    await page.render({ canvasContext: pdfCtx, viewport: viewport }).promise;
+                    redrawAllLines();
+                    document.getElementById('mc-page-num').textContent = pageNum;
+                    document.getElementById('mc-prev-page').disabled = currentPageNum <= 1;
+                    document.getElementById('mc-next-page').disabled = currentPageNum >= totalPages;
+                }
+
+                function showPrevPage() { if (currentPageNum > 1) { currentPageNum--; renderPage(currentPageNum); } }
+                function showNextPage() { if (currentPageNum < totalPages) { currentPageNum++; renderPage(currentPageNum); } }
+                function setupCanvas(width, height) { const pdfCanvas = document.getElementById('mc-pdf-canvas'); const wrapper = document.getElementById('mc-canvas-wrapper'); pdfCanvas.width = drawingCanvas.width = width; pdfCanvas.height = drawingCanvas.height = height; wrapper.style.width = width + 'px'; wrapper.style.height = height + 'px'; }
+                function clearCurrentPageLines() { if (pageLayouts[currentPageNum]) { pageLayouts[currentPageNum] = { h: [], v: [] }; redrawAllLines(); } }
+                
+                function redrawAllLines() {
+                    drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                    const currentLayout = pageLayouts[currentPageNum] || { h: [], v: [] };
+                    
+                    const drawLine = (line, type) => {
+                        const isHovered = hoveredLine && hoveredLine.line === line;
+                        const isBeingDragged = isDragging && selectedLine && selectedLine.line === line;
+                        
+                        drawingCtx.lineWidth = isBeingDragged ? 2.5 : (isHovered ? 2 : 1.5);
+                        drawingCtx.strokeStyle = (isBeingDragged || isHovered) ? '#2980b9' : '#3498db';
+                        drawingCtx.beginPath();
+                        if (type === 'h') { drawingCtx.moveTo(0, line.y); drawingCtx.lineTo(drawingCanvas.width, line.y); } 
+                        else { drawingCtx.moveTo(line.x, 0); drawingCtx.lineTo(line.x, drawingCanvas.height); }
+                        drawingCtx.stroke();
+                    };
+
+                    currentLayout.h.forEach(line => drawLine(line, 'h'));
+                    currentLayout.v.forEach(line => drawLine(line, 'v'));
+                }
+                
+                function getLineAtPos({ x, y }) {
+                    const currentLayout = pageLayouts[currentPageNum]; if (!currentLayout) return null;
+                    for (const line of currentLayout.h) { if (Math.abs(y - line.y) < DRAG_SENSITIVITY) return { type: 'h', line }; }
+                    for (const line of currentLayout.v) { if (Math.abs(x - line.x) < DRAG_SENSITIVITY) return { type: 'v', line }; }
+                    return null;
+                }
+                
+                function deleteLine(fullLineInfoObject) {
+                    const page = pageLayouts[currentPageNum];
+                    if (!fullLineInfoObject || !page) return;
+                    if (fullLineInfoObject.type === 'h') {
+                        page.h = page.h.filter(l => l !== fullLineInfoObject.line);
+                    } else {
+                        page.v = page.v.filter(l => l !== fullLineInfoObject.line);
+                    }
+                }
+
+                function addNewLine(orientation, pos) {
+                    const page = pageLayouts[currentPageNum]; if (!page) return;
+                    if (orientation === 'vertical') { page.v.push({ x: pos.x }); } 
+                    else { page.h.push({ y: pos.y }); }
+                    redrawAllLines();
+                }
+                
+                function getMousePos(evt) { return { x: evt.offsetX, y: evt.offsetY }; }
+                
+                async function generateExcelFromAllPages() {
+                    statusContainer.innerHTML = '<p>Extracting data from all pages...</p>';
+                    let allPagesData = [];
+                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                        const currentLayout = pageLayouts[pageNum];
+                        if (!currentLayout || currentLayout.h.length < 2 || currentLayout.v.length < 2) continue;
+                        statusContainer.innerHTML = `<p>Processing page ${pageNum}/${totalPages}...</p>`;
+                        const page = await pdfDoc.getPage(pageNum);
+                        const scale = 1.5;
+                        const viewport = page.getViewport({ scale });
+                        const textContent = await page.getTextContent();
+                        const horizontalLines = [...currentLayout.h].sort((a, b) => a.y - b.y);
+                        const verticalLines = [...currentLayout.v].sort((a, b) => a.x - b.x);
+                        for (let i = 0; i < horizontalLines.length - 1; i++) {
+                            let row = [];
+                            for (let j = 0; j < verticalLines.length - 1; j++) {
+                                const top = horizontalLines[i].y, bottom = horizontalLines[i + 1].y, left = verticalLines[j].x, right = verticalLines[j + 1].x;
+                                let cellText = textContent.items.filter(item => {
+                                    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                                    const x = tx[4], y = tx[5];
+                                    return x >= left && x <= right && y >= top && y <= bottom;
+                                }).map(item => item.str).join(' ');
+                                row.push(cellText.trim());
+                            }
+                            allPagesData.push(row);
+                        }
+                    }
+
+                    if (allPagesData.length === 0) {
+                        statusContainer.innerHTML = '<p style="color: red;">No data extracted. Please define table areas with horizontal and vertical lines.</p>';
+                        return;
+                    }
+
+                    const worksheet = XLSX.utils.aoa_to_sheet(allPagesData);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                    
+                    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                    const blob = new Blob([wbout], { type: "application/octet-stream" });
+                    const fileName = generateOutputFilename(selectedFiles[0], 'manual_converted', 'xlsx');
+                    
+                    document.getElementById('mc-container').style.display = 'none';
+                    outputArea.innerHTML = '';
+                    displayDownloadLink(blob, fileName);
+                    statusContainer.innerHTML = '';
+                }
+                
+                function syncLayouts() {const applyToAllChk = document.getElementById('mc-apply-to-all-pages-chk'); if (applyToAllChk.checked) { const sourceLayout = pageLayouts[currentPageNum]; if (!sourceLayout) return; const layoutCopy = JSON.parse(JSON.stringify(sourceLayout)); for (let i = 1; i <= totalPages; i++) { pageLayouts[i] = JSON.parse(JSON.stringify(layoutCopy)); } statusContainer.innerHTML = '<p style="color: green;">Current layout has been applied to all pages.</p>'; } else { const currentLayout = pageLayouts[currentPageNum] ? JSON.parse(JSON.stringify(pageLayouts[currentPageNum])) : {h:[], v:[]}; for (let i = 1; i <= totalPages; i++) { pageLayouts[i] = { h: [], v: [] }; } pageLayouts[currentPageNum] = currentLayout; statusContainer.innerHTML = '<p style="color: blue;">Layout is now specific to this page only.</p>';} setTimeout(() => statusContainer.innerHTML = '', 3000); redrawAllLines(); }
+                async function autoDetectLines(orientation) { statusContainer.innerHTML = '<p>Detecting lines...</p>'; const applyToAllChk = document.getElementById('mc-apply-to-all-pages-chk'); const page = await pdfDoc.getPage(currentPageNum); const scale = 1.5; const viewport = page.getViewport({ scale }); const textContent = await page.getTextContent(); const detectedLines = []; const coords = new Map(), THRESHOLD = 3; textContent.items.forEach(item => { const tx = pdfjsLib.Util.transform(viewport.transform, item.transform); const point = (orientation === 'horizontal') ? Math.round(tx[5]) : Math.round(tx[4]); coords.set(point, (coords.get(point) || 0) + 1); }); if(orientation === 'horizontal') { for(let [y, count] of coords.entries()) if(count >= THRESHOLD) detectedLines.push({y}); } else { for(let [x, count] of coords.entries()) if(count >= THRESHOLD) detectedLines.push({x}); } if (applyToAllChk.checked) { for(let i = 1; i <= totalPages; i++){ if(pageLayouts[i]){if (orientation === 'horizontal') pageLayouts[i].h = JSON.parse(JSON.stringify(detectedLines)); else pageLayouts[i].v = JSON.parse(JSON.stringify(detectedLines));}}} else { if (orientation === 'horizontal') pageLayouts[currentPageNum].h = detectedLines; else pageLayouts[currentPageNum].v = detectedLines; } redrawAllLines(); statusContainer.innerHTML = ''; }
+                
+                // Initial load
+                handleFileSelect(file);
+            }
+            // --- END OF MANUAL CONVERTER LOGIC ---
          
              const setupPdfEditor = () => {
+                const canvasWrapper = document.getElementById('canvas-wrapper');
                 const canvas = document.getElementById('pdf-canvas');
                 const ctx = canvas.getContext('2d');
-                const fontControls = document.getElementById('font-style-buttons').parentElement.parentElement;
-                const shapeControls = document.getElementById('fill-shape-check').parentElement;
                 const universalSizeInput = document.getElementById('universal-size');
                 const selectedColorView = document.getElementById('selected-color-view');
                 const colorGrid = document.getElementById('color-grid');
@@ -472,6 +1194,11 @@
                 const boldBtn = document.getElementById('bold-btn');
                 const italicBtn = document.getElementById('italic-btn');
                 const underlineBtn = document.getElementById('underline-btn');
+                const textOptions = document.getElementById('text-fieldset');
+                const shapeOptions = document.getElementById('shape-fieldset');
+
+                let historyStack = [];
+                let historyIndex = -1;
                 
                 let currentTool = 'text';
                 let currentColor = '#000000';
@@ -498,30 +1225,66 @@
                         colorGrid.appendChild(colorBox);
                     });
                 }
+
+                const saveState = () => {
+                    historyStack = historyStack.slice(0, historyIndex + 1);
+                    historyStack.push(JSON.parse(JSON.stringify(drawingActions)));
+                    historyIndex++;
+                    updateUndoRedo();
+                };
+
+                const updateUndoRedo = () => {
+                    document.getElementById('undo-btn').disabled = historyIndex <= 0;
+                    document.getElementById('redo-btn').disabled = historyIndex === historyStack.length - 1;
+                };
+
+                const undo = () => {
+                    if (historyIndex > 0) {
+                        historyIndex--;
+                        drawingActions = JSON.parse(JSON.stringify(historyStack[historyIndex]));
+                        redraw();
+                        updateUndoRedo();
+                    }
+                };
+
+                const redo = () => {
+                    if (historyIndex < historyStack.length - 1) {
+                        historyIndex++;
+                        drawingActions = JSON.parse(JSON.stringify(historyStack[historyIndex]));
+                        redraw();
+                        updateUndoRedo();
+                    }
+                };
                 
                 const setInitialBackground = () => {
                     bgCanvas.width = canvas.width; bgCanvas.height = canvas.height;
                     bgCanvas.getContext('2d').drawImage(canvas, 0, 0);
+                    historyStack = [JSON.parse(JSON.stringify(drawingActions))];
+                    historyIndex = 0;
+                    updateUndoRedo();
                 };
          
                 const getFontString = (action) => `${action.italic ? 'italic ' : ''}${action.bold ? 'bold ' : ''}${action.size}px ${action.font}`;
          
-                const updateToolbarState = () => {
-                     const isTextRelated = currentTool === 'text' || (currentTool === 'select' && selectedActionIndex !== -1 && drawingActions[selectedActionIndex]?.type === 'text');
-                     fontControls.querySelector('select').disabled = !isTextRelated;
-                     fontControls.querySelector('.font-style-buttons').style.opacity = isTextRelated ? 1 : 0.5;
-                     fontControls.querySelector('.font-style-buttons').style.pointerEvents = isTextRelated ? 'auto' : 'none';
-                     shapeControls.querySelector('input').disabled = ['select', 'text'].includes(currentTool);
-                     if (isTextRelated) {
+                 const updateToolbarState = () => {
+                    const isTextTool = currentTool === 'text';
+                    const isShapeTool = ['line', 'rectangle', 'circle'].includes(currentTool);
+                    const isSelection = currentTool === 'select' && selectedActionIndex > -1;
+                    const isSelectedText = isSelection && drawingActions[selectedActionIndex]?.type === 'text';
+
+                    textOptions.disabled = !isTextTool && !isSelectedText;
+                    shapeOptions.disabled = !isShapeTool;
+                    
+                    if (isTextTool || isSelectedText) {
                          universalSizeInput.value = currentFontSize;
-                         if (selectedActionIndex > -1) {
+                         if (isSelectedText) {
                              const action = drawingActions[selectedActionIndex];
                              universalSizeInput.value = action.size;
                              fontFamilySelect.value = action.font;
                              boldBtn.classList.toggle('active', !!action.bold);
                              italicBtn.classList.toggle('active', !!action.italic);
                              underlineBtn.classList.toggle('active', !!action.underline);
-                             setColor(action.color);
+                             setColor(action.color, false);
                          }
                      } else {
                          universalSizeInput.value = currentToolSize;
@@ -534,15 +1297,17 @@
                     ctx.drawImage(bgCanvas, 0, 0);
                     
                     drawingActions.forEach((action, index) => {
-                        Object.assign(ctx, { 
-                            fillStyle: action.color, 
-                            strokeStyle: action.color, 
-                            lineWidth: action.size, 
-                            lineCap: 'round', 
-                            lineJoin: 'round' 
-                        });
+                        ctx.fillStyle = action.color;
+                        ctx.strokeStyle = action.color;
+                        ctx.lineWidth = action.size;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
                         
-                        if (action.type === 'path') {
+                        if(action.type === 'highlight') {
+                            ctx.globalAlpha = 0.5;
+                            ctx.fillRect(action.startX, action.startY, action.endX - action.startX, action.endY - action.startY);
+                            ctx.globalAlpha = 1.0;
+                        } else if (action.type === 'path') {
                             ctx.beginPath();
                             if(action.points.length > 0){ 
                                 ctx.moveTo(action.points[0].x, action.points[0].y); 
@@ -556,10 +1321,11 @@
                             ctx.fillText(action.text, action.x, action.y);
                             if (action.underline) {
                                 const textWidth = ctx.measureText(action.text).width;
-                                Object.assign(ctx, {lineWidth: Math.max(1, Math.floor(action.size / 15)) });
+                                const underline_offset = action.size * 0.1;
+                                ctx.lineWidth = Math.max(1, Math.floor(action.size / 15));
                                 ctx.beginPath();
-                                ctx.moveTo(action.x, action.y + parseInt(action.size, 10) + 2); 
-                                ctx.lineTo(action.x + textWidth, action.y + parseInt(action.size, 10) + 2);
+                                ctx.moveTo(action.x, action.y + action.size + underline_offset); 
+                                ctx.lineTo(action.x + textWidth, action.y + action.size + underline_offset);
                                 ctx.stroke();
                             }
                         } else if (['line', 'rectangle', 'circle'].includes(action.type)) {
@@ -568,7 +1334,7 @@
                                 ctx.moveTo(action.startX, action.startY); 
                                 ctx.lineTo(action.endX, action.endY); 
                             } else if (action.type === 'rectangle') { 
-                                ctx.rect(action.startX, action.startY, action.endX - action.startX, action.endY - action.startY); 
+                                ctx.rect(action.startX, startY, action.endX - action.startX, action.endY - action.startY); 
                             } else if (action.type === 'circle') { 
                                 const radiusX = Math.abs(action.endX - action.startX) / 2; 
                                 const radiusY = Math.abs(action.endY - action.startY) / 2;
@@ -579,25 +1345,60 @@
                            action.fill ? ctx.fill() : ctx.stroke();
                         }
          
-                        if (withPreview && index === selectedActionIndex && action.type === 'text') {
-                           Object.assign(ctx, {strokeStyle: 'rgba(0, 100, 255, 0.7)', lineWidth: 1});
-                           ctx.setLineDash([4, 2]); 
-                           const textWidth = ctx.measureText(action.text).width;
-                           ctx.strokeRect(action.x - 3, action.y - 3, textWidth + 6, parseInt(action.size, 10) + 6);
+                        if (withPreview && index === selectedActionIndex) {
+                           ctx.strokeStyle = 'rgba(0, 100, 255, 0.7)';
+                           ctx.lineWidth = 2;
+                           ctx.setLineDash([6, 3]);
+                           let x, y, w, h;
+                           if (action.type === 'text') {
+                                ctx.font = getFontString(action);
+                                x = action.x - 4; y = action.y - 4;
+                                w = ctx.measureText(action.text).width + 8; h = action.size + 8;
+                           } else if (action.type === 'path') {
+                                const buffer = action.size / 2;
+                                const minX = Math.min(...action.points.map(p => p.x)) - buffer;
+                                const minY = Math.min(...action.points.map(p => p.y)) - buffer;
+                                const maxX = Math.max(...action.points.map(p => p.x)) + buffer;
+                                const maxY = Math.max(...action.points.map(p => p.y)) + buffer;
+                                x = minX - 4; y = minY - 4; w = (maxX - minX) + 8; h = (maxY - minY) + 8;
+                           } else { 
+                                const buffer = action.size / 2;
+                                x = Math.min(action.startX, action.endX) - buffer - 4;
+                                y = Math.min(action.startY, action.endY) - buffer - 4;
+                                w = Math.abs(action.endX - action.startX) + (buffer*2) + 8;
+                                h = Math.abs(action.endY - action.startY) + (buffer*2) + 8;
+                           }
+                           ctx.strokeRect(x, y, w, h);
                            ctx.setLineDash([]);
                         }
                     });
                 };
          
-                const getMousePos = (e) => ({ x: (e.clientX - canvas.getBoundingClientRect().left) * (canvas.width / canvas.getBoundingClientRect().width), y: (e.clientY - canvas.getBoundingClientRect().top) * (canvas.height / canvas.getBoundingClientRect().height) });
+                const getMousePos = (e) => ({ x: (e.clientX - canvasWrapper.getBoundingClientRect().left) * (canvas.width / canvasWrapper.getBoundingClientRect().width), y: (e.clientY - canvasWrapper.getBoundingClientRect().top) * (canvas.height / canvasWrapper.getBoundingClientRect().height) });
                 
                 const hitTest = (x, y) => { 
                     for (let i = drawingActions.length - 1; i >= 0; i--) { 
-                        const action = drawingActions[i]; 
+                        const action = drawingActions[i];
+                        let minX, minY, maxX, maxY; 
                         if (action.type === 'text') { 
-                            ctx.font = getFontString(action); 
-                            if (x >= action.x && x <= action.x + ctx.measureText(action.text).width && y >= action.y && y <= action.y + parseInt(action.size, 10)) return i; 
-                        } 
+                            ctx.font = getFontString(action);
+                            minX = action.x; maxX = action.x + ctx.measureText(action.text).width;
+                            minY = action.y; maxY = action.y + parseInt(action.size, 10);
+                        } else if (action.type === 'path') {
+                            const buffer = (action.size / 2) + 4;
+                            minX = Math.min(...action.points.map(p => p.x)) - buffer;
+                            minY = Math.min(...action.points.map(p => p.y)) - buffer;
+                            maxX = Math.max(...action.points.map(p => p.x)) + buffer;
+                            maxY = Math.max(...action.points.map(p => p.y)) + buffer;
+                        } else if (['line', 'rectangle', 'circle', 'highlight'].includes(action.type)){
+                            const buffer = (action.size / 2) + 4;
+                            minX = Math.min(action.startX, action.endX) - buffer;
+                            minY = Math.min(action.startY, action.endY) - buffer;
+                            maxX = Math.max(action.startX, action.endX) + buffer;
+                            maxY = Math.max(action.startY, action.endY) + buffer;
+                        }
+
+                        if (x >= minX && x <= maxX && y >= minY && y <= maxY) return i; 
                     } 
                     return -1; 
                 };
@@ -611,6 +1412,7 @@
                             x: parseFloat(textEditor.dataset.x), y: parseFloat(textEditor.dataset.y), font: fontFamilySelect.value, size: currentFontSize, color: currentColor,
                             bold: boldBtn.classList.contains('active'), italic: italicBtn.classList.contains('active'), underline: underlineBtn.classList.contains('active'),
                         });
+                        saveState();
                     }
                     textEditor.style.display = 'none'; 
                     redraw();
@@ -627,63 +1429,80 @@
                         drawingActions.splice(editIndex, 1); 
                         redraw(); 
                     }
-                    const rect = canvas.getBoundingClientRect();
-                    Object.assign(textEditor.style, { display: 'block', left: `${(x * (rect.width/canvas.width)) + rect.left}px`, top: `${(y * (rect.height/canvas.height)) + rect.top}px` });
-                    Object.assign(textEditor.dataset, { x, y }); 
-                    textEditor.value = initialText;
-                    
+                    const rect = canvasWrapper.getBoundingClientRect();
+                    const scaleFactor = rect.width / canvas.width;
                     const style = { 
                         font: action?.font || fontFamilySelect.value, 
                         size: action?.size || currentFontSize, 
                         color: action?.color || currentColor, 
-                        bold: action?.bold, 
-                        italic: action?.italic, 
-                        underline: action?.underline 
+                        bold: action?.bold ?? boldBtn.classList.contains('active'), 
+                        italic: action?.italic ?? italicBtn.classList.contains('active'), 
+                        underline: action?.underline ?? underlineBtn.classList.contains('active')
                     };
-                    Object.assign(textEditor.style, { fontFamily: style.font, fontSize: style.size + 'px', color: style.color, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal' });
+                    
+                    Object.assign(textEditor.style, { display: 'block', left: `${(x * scaleFactor) + rect.left}px`, top: `${(y * scaleFactor) + rect.top}px`, fontFamily: style.font, fontSize: `${style.size * scaleFactor}px`, color: style.color, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', lineHeight: 1 });
+                    Object.assign(textEditor.dataset, { x, y }); 
+                    textEditor.value = initialText;
                     
                     ctx.font = getFontString(style);
-                    textEditor.style.width = `${ctx.measureText(initialText).width + 20}px`;
+                    textEditor.style.width = `${ctx.measureText(initialText).width * scaleFactor + 20}px`;
                     textEditor.focus(); 
                     textEditor.select();
          
                     fontFamilySelect.value = style.font; 
                     universalSizeInput.value = style.size;
                     currentFontSize = style.size;
-                    boldBtn.classList.toggle('active', !!style.bold); 
-                    italicBtn.classList.toggle('active', !!style.italic); 
-                    underlineBtn.classList.toggle('active', !!style.underline);
-                    setColor(style.color); 
+                    boldBtn.classList.toggle('active', style.bold); 
+                    italicBtn.classList.toggle('active', style.italic); 
+                    underlineBtn.classList.toggle('active', style.underline);
+                    setColor(style.color, false); 
                     updateToolbarState();
                 };
          
-                const setColor = (color) => { 
+                const setColor = (color, doSaveState = true) => { 
                     currentColor = color; 
                     selectedColorView.style.backgroundColor = color; 
                     colorPicker.value = color;
-                    if(textEditor.style.display === 'block') textEditor.style.color = color;
+                    if(selectedActionIndex > -1 && drawingActions[selectedActionIndex]) {
+                        drawingActions[selectedActionIndex].color = color;
+                        if(doSaveState) saveState();
+                        redraw();
+                    }
                 };
                 
                 document.getElementById('toolbar-top-row').addEventListener('click', e => {
                     const button = e.target.closest('button');
-                    if (button && button.id.includes('-tool-btn')) {
+                    if (button && !button.disabled) {
                         finalizeText();
-                        document.querySelectorAll('#toolbar-top-row button').forEach(b => b.classList.remove('active'));
-                        button.classList.add('active'); 
-                        currentTool = button.id.replace('-tool-btn', '');
-                        canvas.style.cursor = currentTool === 'select' ? 'default' : (currentTool === 'text' ? 'text' : 'crosshair');
-                        selectedActionIndex = -1; 
-                        redraw(); 
-                        updateToolbarState();
+                        if (button.id === 'undo-btn') undo();
+                        else if (button.id === 'redo-btn') redo();
+                        else if (button.id === 'delete-selection-btn') {
+                            if (selectedActionIndex > -1) {
+                                drawingActions.splice(selectedActionIndex, 1);
+                                selectedActionIndex = -1;
+                                saveState();
+                                redraw();
+                            }
+                        } else if (button.id.includes('-btn') || button.id.includes('-tool')) {
+                            document.querySelectorAll('#toolbar-top-row button.active').forEach(b => b.classList.remove('active'));
+                            button.classList.add('active');
+                            currentTool = button.id.replace('-btn', '').replace('-tool', '');
+                            editorContainer.classList.toggle('text-edit-mode', currentTool === 'edit-page-text');
+                            canvas.style.cursor = currentTool === 'select' ? 'default' : (currentTool === 'text' ? 'text' : 'crosshair');
+                            selectedActionIndex = -1;
+                            redraw();
+                            updateToolbarState();
+                        }
                     }
                 });
                 
                 universalSizeInput.addEventListener('input', () => {
-                     const size = universalSizeInput.value;
-                     if(currentTool === 'text' || (currentTool === 'select' && selectedActionIndex > -1)){
+                     const size = parseInt(universalSizeInput.value, 10);
+                     if (currentTool === 'text' || (currentTool === 'select' && selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text')) {
                          currentFontSize = size;
-                         if(selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text') {
+                         if (selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text') {
                              drawingActions[selectedActionIndex].size = size;
+                             saveState();
                              redraw();
                          }
                      } else {
@@ -691,34 +1510,35 @@
                      }
                 });
 
-                [fontFamilySelect, colorPicker].forEach(el => el.addEventListener('input', () => {
-                    setColor(colorPicker.value);
-                    const isEditing = textEditor.style.display !== 'none';
-                    const targetAction = isEditing ? null : (selectedActionIndex > -1 ? drawingActions[selectedActionIndex] : null);
-                    if (targetAction?.type === 'text') { 
-                         targetAction.font = fontFamilySelect.value;
-                         targetAction.color = currentColor;
-                         redraw(); 
-                    }
-                }));
+                fontFamilySelect.addEventListener('input', () => {
+                     if(selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text') {
+                         drawingActions[selectedActionIndex].font = fontFamilySelect.value;
+                         saveState();
+                         redraw();
+                     }
+                });
          
                 [boldBtn, italicBtn, underlineBtn].forEach(btn => btn.addEventListener('click', () => {
-                    const isTextRelated = currentTool === 'text' || (currentTool === 'select' && selectedActionIndex > -1);
-                    if (!isTextRelated) return;
                     btn.classList.toggle('active');
-                    const targetAction = selectedActionIndex > -1 ? drawingActions[selectedActionIndex] : null;
-                    if (targetAction?.type === 'text') {
-                        const styleProp = btn.id.replace('-btn', '');
-                        targetAction[styleProp] = btn.classList.contains('active');
-                        redraw();
-                    }
+                     if (selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text') {
+                         const styleProp = btn.id.replace('-btn', '');
+                         drawingActions[selectedActionIndex][styleProp] = btn.classList.contains('active');
+                         saveState();
+                         redraw();
+                     }
                 }));
                 
                 colorGrid.addEventListener('click', (e) => { if (e.target.classList.contains('color-box')) setColor(e.target.dataset.color) });
                 selectedColorView.addEventListener('click', () => colorPicker.click());
+                colorPicker.addEventListener('input', () => setColor(colorPicker.value));
                 
-                canvas.addEventListener('mousedown', e => {
-                    if (e.target === textEditor) return; 
+                canvasWrapper.addEventListener('mousedown', e => {
+                    if (e.target.closest('.editable-text-overlay') || e.target === textEditor) return;
+                    if (editorContainer.classList.contains('text-edit-mode')) {
+                        if (activeOverlay) activeOverlay.blur();
+                        return;
+                    }
+                    
                     finalizeText(); 
                     const { x, y } = getMousePos(e); 
                     startX = x; 
@@ -726,42 +1546,66 @@
                     
                     if (currentTool === 'select') {
                         isPainting = false; 
-                        selectedActionIndex = hitTest(x, y);
-                        if (selectedActionIndex > -1) { 
+                        const hitIndex = hitTest(x, y);
+                        if (hitIndex > -1) { 
+                            selectedActionIndex = hitIndex;
                             isDragging = true; 
                             const action = drawingActions[selectedActionIndex]; 
-                            dragOffsetX = x - action.x; 
-                            dragOffsetY = y - action.y; 
+                            dragOffsetX = x - (action.x || action.startX); 
+                            dragOffsetY = y - (action.y || action.startY); 
                         } else {
+                            selectedActionIndex = -1;
                             isDragging = false;
                         }
                         redraw(); 
                         updateToolbarState();
                     } else {
                          isPainting = true;
-                         const size = ['draw', 'erase', 'line', 'rectangle', 'circle'].includes(currentTool) ? currentToolSize : currentFontSize;
-                         if (currentTool === 'draw' || currentTool === 'erase') {
-                             drawingActions.push({ type: 'path', color: currentTool === 'erase' ? '#FFFFFF' : currentColor, size, points: [{ x, y }] });
+                         selectedActionIndex = -1;
+                         if (currentTool === 'erase') {
+                             drawingActions.push({ type: 'path', color: '#FFFFFF', size: 30, points: [{ x, y }] });
                          }
                     }
                 });
                 
-                canvas.addEventListener('mousemove', e => {
+                canvasWrapper.addEventListener('mousemove', e => {
                     if (!isPainting && !isDragging) return; 
                     const { x, y } = getMousePos(e);
                     
                     if (isDragging && selectedActionIndex > -1) { 
-                        drawingActions[selectedActionIndex].x = x - dragOffsetX; 
-                        drawingActions[selectedActionIndex].y = y - dragOffsetY; 
+                        const action = drawingActions[selectedActionIndex];
+                        if (action.type === 'text') {
+                             action.x = x - dragOffsetX;
+                             action.y = y - dragOffsetY;
+                        } else if(action.type === 'path') {
+                             const dx = x - dragOffsetX - action.points[0].x;
+                             const dy = y - dragOffsetY - action.points[0].y;
+                             action.points.forEach(p => { p.x += dx; p.y += dy; });
+                             dragOffsetX = x - action.points[0].x;
+                             dragOffsetY = y - action.points[0].y;
+                        } else {
+                             const dx = x - dragOffsetX - action.startX;
+                             const dy = y - dragOffsetY - action.startY;
+                             action.startX += dx; action.startY += dy;
+                             action.endX += dx; action.endY += dy;
+                             dragOffsetX = x - action.startX;
+                             dragOffsetY = y - action.startY;
+                        }
                         redraw();
                     } else if (isPainting) {
-                        const size = currentToolSize;
-                        if (['draw', 'erase'].includes(currentTool)) {
-                            drawingActions[drawingActions.length - 1].points.push({ x, y });
-                        }
                         redraw(); 
-                        Object.assign(ctx, {strokeStyle:currentColor, fillStyle:currentColor, lineWidth:size});
-                        if (['line', 'rectangle', 'circle'].includes(currentTool)) {
+                        const size = currentToolSize;
+                        ctx.strokeStyle = currentColor;
+                        ctx.fillStyle = currentColor;
+                        ctx.lineWidth = size;
+
+                        if (currentTool === 'erase') {
+                             drawingActions[drawingActions.length - 1].points.push({ x, y });
+                        } else if (currentTool === 'highlight') {
+                            ctx.globalAlpha = 0.5;
+                            ctx.fillRect(startX, startY, x - startX, y - startY);
+                            ctx.globalAlpha = 1.0;
+                        } else if (['line', 'rectangle', 'circle'].includes(currentTool)) {
                             ctx.beginPath();
                             if (currentTool === 'line') { 
                                 ctx.moveTo(startX, startY); ctx.lineTo(x, y); 
@@ -777,24 +1621,34 @@
                     }
                 });
          
-                canvas.addEventListener('mouseup', e => { 
-                    if (!isPainting) { isDragging = false; return; }
+                canvasWrapper.addEventListener('mouseup', e => { 
+                    if (isDragging) saveState();
+                    isDragging = false; 
+                    if (!isPainting) return;
                     isPainting = false; 
                     const { x, y } = getMousePos(e);
-                     const size = ['draw', 'erase', 'line', 'rectangle', 'circle'].includes(currentTool) ? currentToolSize : currentFontSize;
-                    if (['line', 'rectangle', 'circle'].includes(currentTool)) {
-                        drawingActions.push({ type: currentTool, color: currentColor, size, fill: document.getElementById('fill-shape-check').checked, startX, startY, endX: x, endY: y });
+                     const size = ['erase', 'line', 'rectangle', 'circle', 'highlight'].includes(currentTool) ? currentToolSize : currentFontSize;
+                    if (['line', 'rectangle', 'circle', 'highlight', 'erase'].includes(currentTool)) {
+                        if (currentTool !== 'erase') {
+                           drawingActions.push({ type: currentTool, color: currentColor, size, fill: document.getElementById('fill-shape-check').checked, startX, startY, endX: x, endY: y });
+                        }
+                        saveState();
                     }
                     redraw();
                 });
                 
-                canvas.addEventListener('click', e => { 
-                    if(currentTool === 'text') { 
+                canvasWrapper.addEventListener('click', e => { 
+                    if(currentTool === 'text' && e.target.id === 'pdf-canvas') { 
                         const { x, y } = getMousePos(e); 
                         startTextEditing(x, y); 
                     } 
                 });
-                canvas.addEventListener('dblclick', e => { 
+                canvasWrapper.addEventListener('dblclick', e => { 
+                    const overlay = e.target.closest('.editable-text-overlay');
+                    if (overlay && editorContainer.classList.contains('text-edit-mode')) {
+                         makeEditable(overlay);
+                         return;
+                    }
                     if (currentTool === 'select' && selectedActionIndex > -1 && drawingActions[selectedActionIndex].type === 'text') { 
                         const action = drawingActions[selectedActionIndex]; 
                         startTextEditing(action.x, action.y, selectedActionIndex); 
@@ -803,8 +1657,11 @@
                 });
          
                 textEditor.addEventListener('input', () => {
-                    ctx.font = getFontString({ font: textEditor.style.fontFamily, size: currentFontSize, bold: textEditor.style.fontWeight === 'bold', italic: textEditor.style.fontStyle === 'italic' });
-                    textEditor.style.width = `${ctx.measureText(textEditor.value).width + 20}px`;
+                    const rect = canvasWrapper.getBoundingClientRect();
+                    const scaleFactor = rect.width / canvas.width;
+                    const style = { font: textEditor.style.fontFamily, size: currentFontSize, bold: textEditor.style.fontWeight === 'bold', italic: textEditor.style.fontStyle === 'italic' };
+                    ctx.font = getFontString(style);
+                    textEditor.style.width = `${ctx.measureText(textEditor.value).width * scaleFactor + 20}px`;
                 });
                 textEditor.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finalizeText(); } });
                 textEditor.addEventListener('mousedown', e => { isDragging = true; dragOffsetX = e.clientX - textEditor.offsetLeft; dragOffsetY = e.clientY - textEditor.offsetTop; e.stopPropagation(); });
@@ -814,7 +1671,7 @@
                         const newLeft = e.clientX - dragOffsetX, newTop = e.clientY - dragOffsetY;
                         textEditor.style.left = `${newLeft}px`; 
                         textEditor.style.top = `${newTop}px`;
-                        const rect = canvas.getBoundingClientRect();
+                        const rect = canvasWrapper.getBoundingClientRect();
                         textEditor.dataset.x = (newLeft - rect.left) * (canvas.width / rect.width);
                         textEditor.dataset.y = (newTop - rect.top) * (canvas.height / rect.height);
                     }
@@ -824,7 +1681,7 @@
                  return {
                      setInitialBackground,
                      getDrawingActions: () => drawingActions,
-                     setDrawingActions: (actions) => { drawingActions = actions; },
+                     setDrawingActions: (actions) => { drawingActions = actions; saveState(); },
                      redraw,
                      updateToolbarState,
                      finalizeText,
@@ -832,41 +1689,76 @@
              };
              
             const toolImplementations = {
-                'pdf-to-word': { title: 'PDF to Word', desc: 'Convert PDFs to editable DOCX.', fileType: '.pdf', multiple: false, process: (files) => processWithBackend(files, 'pdf-to-word') },
-                'word-to-pdf': { title: 'Word to PDF', desc: 'Create professional PDFs from Word.', fileType: '.docx,.doc,.rtf', multiple: false, process: (files) => processWithBackend(files, 'word-to-pdf') },
-                'pdf-to-excel': { title: 'PDF to Excel', desc: 'Extract data from PDFs into XLSX.', fileType: '.pdf', multiple: false, process: (files) => processWithBackend(files, 'pdf-to-excel') },
-                'excel-to-pdf': { title: 'Excel to PDF', desc: 'Turn spreadsheets into professional PDFs.', fileType: '.xlsx,.xls,.csv', multiple: false, process: (files) => processWithBackend(files, 'excel-to-pdf') },
-                'add-page-numbers': { 
-                   title: 'Add Page Numbers', 
-                   desc: 'Insert page numbers into your PDF.', 
-                   fileType: '.pdf', 
-                   multiple: false, 
-                   options: () => `<div style="display: flex; gap: 20px; align-items: flex-end;"><div style="flex-grow: 1;"><label for="vertical-pos">Position:</label><select id="vertical-pos"><option value="footer" selected>Footer (Bottom of page)</option><option value="header">Header (Top of page)</option></select></div><div style="flex-grow: 1;"><label for="horizontal-align">Alignment:</label><select id="horizontal-align"><option value="center" selected>Center</option><option value="left">Left</option><option value="right">Right</option></select></div></div>`,
-                   process: async (files, options) => {
-                       showLoader('Adding page numbers...');
-                       const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true });
-                       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-                       const pages = pdfDoc.getPages();
-                       for(let i=0; i<pages.length; i++) {
-                           const page = pages[i];
-                           const { width, height } = page.getSize();
-                           const text = `${i+1} / ${pages.length}`;
-                           const textWidth = font.widthOfTextAtSize(text, 12);
-                           const y = (options['vertical-pos'] === 'header') ? height - 40 : 30;
-                           let x;
-                           if (options['horizontal-align'] === 'left') x = 40;
-                           else if (options['horizontal-align'] === 'right') x = width - textWidth - 40;
-                           else x = width / 2 - textWidth / 2;
-                           page.drawText(text, { x, y, size: 12, font, color: rgb(0, 0, 0) });
-                       }
-                       displayDownloadLink(new Blob([await pdfDoc.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'numbered'));
-                   } 
+                 'pdf-to-excel': { 
+                    title: 'PDF to Excel', 
+                    desc: 'Extract data from PDFs into XLSX.', 
+                    fileType: '.pdf', 
+                    multiple: false, 
+                    isExcelTool: true, // Custom flag
+                    process: (files) => processWithBackend(files, 'pdf-to-excel') 
                 },
-                 'delete-pdf-pages': { title: 'Delete Pages', desc: 'Remove pages from a PDF.', fileType: '.pdf', multiple: false, isVisualDeleter: true },
-                 'edit-pdf': { title: 'Edit PDF', desc: 'Draw and add text to your PDF.', fileType: '.pdf', multiple: false, isEditor: true },
-                 'merge-pdf': { title: 'Merge PDF', desc: 'Combine multiple PDFs into one.', fileType: '.pdf', multiple: true, process: async (files) => { const mergedPdf = await PDFDocument.create(); for (let i = 0; i < files.length; i++) { showLoader(`Merging file ${i+1}/${files.length}...`); const pdf = await PDFDocument.load(await readFileAsArrayBuffer(files[i]), { ignoreEncryption: true }); const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices()); copiedPages.forEach(page => mergedPdf.addPage(page)); } displayDownloadLink(new Blob([await mergedPdf.save()], { type: 'application/pdf' }), generateOutputFilename(null, 'merged')); } },
-                 'split-pdf': { title: 'Split PDF', desc: 'Extract pages into a new PDF.', fileType: '.pdf', multiple: false, options: () => `<label for="page-range">Page range to extract (e.g., 2-5, 8):</label><input type="text" id="page-range" placeholder="e.g., 2-5, 8, 10-12">`, process: async (files, options) => { if (!options['page-range']) throw new Error('Page range is required.'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pageIndices = parsePageRanges(options['page-range'], pdfDoc.getPageCount()); if (pageIndices.length === 0) throw new Error("Invalid page range specified."); const newPdf = await PDFDocument.create(); showLoader(`Copying ${pageIndices.length} pages...`); const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices); copiedPages.forEach(page => newPdf.addPage(page)); displayDownloadLink(new Blob([await newPdf.save()], { type: 'application/pdf' }), generateOutputFilename(files[0], 'split')); } },
-                 'rearrange-pages': { title: 'Rearrange Pages', desc: 'Sort or reorder PDF pages.', fileType: '.pdf', multiple: false, options: () => `<label for="page-order">New page order (e.g., 3,1,5-7):</label><input type="text" id="page-order" placeholder="e.g., 3, 1, 5-7, 2">`, process: async(files, options) => { if(!options['page-order']) throw new Error("New page order is required."); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pageIndices = parsePageRanges(options['page-order'], pdfDoc.getPageCount()); if (pageIndices.length === 0) throw new Error("Invalid page order specified."); const newPdf = await PDFDocument.create(); showLoader(`Copying ${pageIndices.length} pages...`); const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices); copiedPages.forEach(page => newPdf.addPage(page)); displayDownloadLink(new Blob([await newPdf.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'rearranged')); } },
+                 'excel-to-pdf': { title: 'Excel to PDF', desc: 'Turn spreadsheets into professional PDFs.', fileType: '.xlsx,.xls,.csv', multiple: false, process: (files) => processWithBackend(files, 'excel-to-pdf') },
+                 'word-to-pdf': { title: 'Word to PDF', desc: 'Create professional PDFs from Word.', fileType: '.docx,.doc,.rtf', multiple: false, process: (files) => processWithBackend(files, 'word-to-pdf') },
+                 'pdf-to-word': {
+    title: 'PDF to Word',
+    desc: 'Convert PDFs to editable DOCX.',
+    fileType: '.pdf',
+    multiple: false,
+    process: async (files) => {
+        const file = files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        const premiumUrl = `https://all-tool-pdf-final.onrender.com/pdf-to-word-premium`;
+        const basicUrl = `https://all-tool-pdf-final.onrender.com/pdf-to-word-basic`;
+
+        try {
+            // Step 1: Try the high-quality server first
+            showLoader('Processing with high-quality server...');
+            const response = await fetch(premiumUrl, { method: 'POST', body: formData });
+            
+            if (!response.ok) {
+                // If it fails, throw an error to trigger the fallback
+                throw new Error('Premium conversion failed');
+            }
+            
+            const blob = await response.blob();
+            const finalFileName = generateOutputFilename(file, 'converted', 'docx');
+            outputArea.innerHTML = '';
+            displayDownloadLink(blob, finalFileName);
+
+        } catch (err) {
+            // Step 2: If the premium server fails, automatically try the basic one
+            console.warn("High-quality conversion failed. Switching to basic fallback converter.");
+            showLoader('Server is busy, using standard converter...');
+            try {
+                const fallbackResponse = await fetch(basicUrl, { method: 'POST', body: formData });
+                
+                if (!fallbackResponse.ok) {
+                    throw new Error('Fallback conversion also failed.');
+                }
+                
+                const blob = await fallbackResponse.blob();
+                const finalFileName = generateOutputFilename(file, 'converted_basic', 'docx');
+                outputArea.innerHTML = '';
+
+                // Add a friendly warning message for the user
+                const warningMessage = document.createElement('p');
+                warningMessage.style.color = '#e67e22';
+                warningMessage.style.marginBottom = '15px'; // Thora sa fasla
+                warningMessage.textContent = 'High-quality server was busy. A standard conversion was performed, so formatting may be simple.';
+                outputArea.appendChild(warningMessage);
+                
+                displayDownloadLink(blob, finalFileName);
+            
+            } catch (fallbackErr) {
+                showError("Both high-quality and standard converters failed. Please try again later or with a different file.");
+            }
+        } finally {
+            hideLoader();
+            processBtn.style.display = 'none';
+        }
+    }
+},
                  'pdf-to-powerpoint': { title: 'PDF to PowerPoint', desc: 'Turn PDFs into editable PPTX.', fileType: '.pdf', multiple: false, process: advancedToolComingSoon },
                  'powerpoint-to-pdf': { title: 'PowerPoint to PDF', desc: 'Convert PPTX into shareable PDFs.', fileType: '.pptx,.ppt', multiple: false, process: (files) => processWithBackend(files, 'powerpoint-to-pdf') },
                  'pdf-to-jpg': { 
@@ -915,6 +1807,38 @@
                      } 
                  },
                  'html-to-pdf': { title: 'HTML to PDF', desc: 'Convert web pages or HTML into PDF.', fileType: '.html', multiple: false, process: async (files) => { const reader = new FileReader(); reader.onload = async (e) => { showLoader('Generating High-Quality PDF...'); const options = { margin: 0.5, filename: 'file.pdf', image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 4 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } }; const pdfBlob = await html2pdf().from(e.target.result).set(options).outputPdf('blob'); displayDownloadLink(pdfBlob, generateOutputFilename(files[0], 'from_html')); }; reader.readAsText(files[0]); } },
+                 'pdf-to-text': { title: 'PDF to Text', desc: 'Extract plain text from your PDF.', fileType: '.pdf', multiple: false, process: async(files) => { const pdf = await pdfjsLib.getDocument({ data: await readFileAsArrayBuffer(files[0]) }).promise; let fullText = ''; for(let i=1; i <= pdf.numPages; i++) { showLoader(`Extracting text from page ${i}/${pdf.numPages}`); const page = await pdf.getPage(i); const textContent = await page.getTextContent(); fullText += textContent.items.map(item => item.str).join(' ') + '\n\n'; } displayDownloadLink(new Blob([fullText], {type: 'text/plain'}), generateOutputFilename(files[0], 'text', 'txt')); } },
+                 'add-page-numbers': { 
+                    title: 'Add Page Numbers', 
+                    desc: 'Insert page numbers into your PDF.', 
+                    fileType: '.pdf', 
+                    multiple: false, 
+                    options: () => `<div style="display: flex; gap: 20px; align-items: flex-end;"><div style="flex-grow: 1;"><label for="vertical-pos">Position:</label><select id="vertical-pos"><option value="footer" selected>Footer (Bottom of page)</option><option value="header">Header (Top of page)</option></select></div><div style="flex-grow: 1;"><label for="horizontal-align">Alignment:</label><select id="horizontal-align"><option value="center" selected>Center</option><option value="left">Left</option><option value="right">Right</option></select></div></div>`,
+                    process: async (files, options) => {
+                        showLoader('Adding page numbers...');
+                        const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true });
+                        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                        const pages = pdfDoc.getPages();
+                        for(let i=0; i<pages.length; i++) {
+                            const page = pages[i];
+                            const { width, height } = page.getSize();
+                            const text = `${i+1} / ${pages.length}`;
+                            const textWidth = font.widthOfTextAtSize(text, 12);
+                            const y = (options['vertical-pos'] === 'header') ? height - 40 : 30;
+                            let x;
+                            if (options['horizontal-align'] === 'left') x = 40;
+                            else if (options['horizontal-align'] === 'right') x = width - textWidth - 40;
+                            else x = width / 2 - textWidth / 2;
+                            page.drawText(text, { x, y, size: 12, font, color: rgb(0, 0, 0) });
+                        }
+                        displayDownloadLink(new Blob([await pdfDoc.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'numbered'));
+                    } 
+                },
+                 'delete-pdf-pages': { title: 'Delete Pages', desc: 'Remove pages from a PDF.', fileType: '.pdf', multiple: false, isVisualDeleter: true },
+                 'edit-pdf': { title: 'Edit PDF', desc: 'Draw and add text to your PDF.', fileType: '.pdf', multiple: false, isEditor: true },
+                 'merge-pdf': { title: 'Merge PDF', desc: 'Combine multiple PDFs into one.', fileType: '.pdf', multiple: true, process: async (files) => { const mergedPdf = await PDFDocument.create(); for (let i = 0; i < files.length; i++) { showLoader(`Merging file ${i+1}/${files.length}...`); const pdf = await PDFDocument.load(await readFileAsArrayBuffer(files[i]), { ignoreEncryption: true }); const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices()); copiedPages.forEach(page => mergedPdf.addPage(page)); } displayDownloadLink(new Blob([await mergedPdf.save()], { type: 'application/pdf' }), generateOutputFilename(null, 'merged')); } },
+                 'split-pdf': { title: 'Split PDF', desc: 'Extract pages into a new PDF.', fileType: '.pdf', multiple: false, options: () => `<label for="page-range">Page range to extract (e.g., 2-5, 8):</label><input type="text" id="page-range" placeholder="e.g., 2-5, 8, 10-12">`, process: async (files, options) => { if (!options['page-range']) throw new Error('Page range is required.'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pageIndices = parsePageRanges(options['page-range'], pdfDoc.getPageCount()); if (pageIndices.length === 0) throw new Error("Invalid page range specified."); const newPdf = await PDFDocument.create(); showLoader(`Copying ${pageIndices.length} pages...`); const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices); copiedPages.forEach(page => newPdf.addPage(page)); displayDownloadLink(new Blob([await newPdf.save()], { type: 'application/pdf' }), generateOutputFilename(files[0], 'split')); } },
+                 'rearrange-pages': { title: 'Rearrange Pages', desc: 'Sort or reorder PDF pages.', fileType: '.pdf', multiple: false, options: () => `<label for="page-order">New page order (e.g., 3,1,5-7):</label><input type="text" id="page-order" placeholder="e.g., 3, 1, 5-7, 2">`, process: async(files, options) => { if(!options['page-order']) throw new Error("New page order is required."); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pageIndices = parsePageRanges(options['page-order'], pdfDoc.getPageCount()); if (pageIndices.length === 0) throw new Error("Invalid page order specified."); const newPdf = await PDFDocument.create(); showLoader(`Copying ${pageIndices.length} pages...`); const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices); copiedPages.forEach(page => newPdf.addPage(page)); displayDownloadLink(new Blob([await newPdf.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'rearranged')); } },
                  'compress-pdf': { title: 'Compress PDF', desc: 'Reduce file size of your PDF.', fileType: '.pdf', multiple: false, process: async (files) => { showLoader('Applying basic compression...'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); displayDownloadLink(new Blob([await pdfDoc.save({ useObjectStreams: false })], { type: 'application/pdf' }), generateOutputFilename(files[0], 'compressed')); } },
                  'rotate-pdf': { title: 'Rotate PDF', desc: 'Rotate pages in your PDF.', fileType: '.pdf', multiple: false, options: () => `<label for="rotation-angle">Rotation:</label><select id="rotation-angle"><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">90° counter-clockwise</option></select><label for="page-range-rotate">Pages (blank for all):</label><input type="text" id="page-range-rotate" placeholder="e.g., 1, 3, 5-7">`, process: async(files, options) => { const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pagesToRotate = parsePageRanges(options['page-range-rotate'], pdfDoc.getPageCount()); showLoader(`Rotating ${pagesToRotate.length} pages...`); pagesToRotate.forEach(index => { const page = pdfDoc.getPage(index); page.setRotation(degrees(page.getRotation().angle + parseInt(options['rotation-angle'], 10))); }); displayDownloadLink(new Blob([await pdfDoc.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'rotated')); } },
                  'protect-pdf': { title: 'Protect PDF', desc: 'Secure PDF with a password.', fileType: '.pdf', multiple: false, options: () => `<label for="pdf-password">Set Password:</label><input type="password" id="pdf-password" placeholder="Enter a strong password">`, process: async (files, options) => { if (!options['pdf-password']) throw new Error('Password is required.'); showLoader('Encrypting PDF...'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); displayDownloadLink(new Blob([await pdfDoc.save({ userPassword: options['pdf-password'] })], { type: 'application/pdf' }), generateOutputFilename(files[0], 'protected')); } },
@@ -922,7 +1846,6 @@
                  'ocr-pdf': { title: 'OCR PDF', desc: 'Extract text from a scanned PDF.', fileType: '.pdf,image/*', multiple: false, process: async(files) => { showLoader("Initializing OCR Engine..."); const worker = await Tesseract.createWorker('eng', 1, { logger: m => { if(m.status === 'recognizing text') showLoader(`Recognizing Text: ${Math.round(m.progress * 100)}%`) }}); const { data: { text } } = await worker.recognize(files[0]); await worker.terminate(); displayDownloadLink(new Blob([text], { type: 'text/plain' }), generateOutputFilename(files[0], 'ocr', 'txt')); } },
                  'searchable-pdf': { title: 'Searchable PDF', desc: 'Make a scanned PDF searchable.', fileType: '.pdf', multiple: false, process: async (files) => { showLoader("Initializing OCR... (This may be slow)"); const worker = await Tesseract.createWorker('eng', 1, { logger: m => showLoader(`${m.status.charAt(0).toUpperCase() + m.status.slice(1)}: ${Math.round(m.progress * 100)}%`) }); const { data } = await worker.recognize(files[0], { pdf: true }); displayDownloadLink(new Blob([new Uint8Array(data.pdf)], {type:'application/pdf'}), generateOutputFilename(files[0], 'searchable')); await worker.terminate(); }},
                  'pdf-to-pdfa': { title: 'PDF to PDF/A', desc: 'Convert for long-term archiving.', fileType: '.pdf', multiple: false, process: advancedToolComingSoon },
-                 'pdf-to-text': { title: 'PDF to Text', desc: 'Extract plain text from your PDF.', fileType: '.pdf', multiple: false, process: async(files) => { const pdf = await pdfjsLib.getDocument({ data: await readFileAsArrayBuffer(files[0]) }).promise; let fullText = ''; for(let i=1; i <= pdf.numPages; i++) { showLoader(`Extracting text from page ${i}/${pdf.numPages}`); const page = await pdf.getPage(i); const textContent = await page.getTextContent(); fullText += textContent.items.map(item => item.str).join(' ') + '\n\n'; } displayDownloadLink(new Blob([fullText], {type: 'text/plain'}), generateOutputFilename(files[0], 'text', 'txt')); } },
                  'esign-pdf': { title: 'eSign PDF', desc: 'Sign your PDF documents.', fileType: '.pdf', multiple: false, options: () => `<label for="sig">Signature Image (PNG/JPG):</label><input type="file" id="sig" accept="image/png, image/jpeg"><br><label for="page">Page to Sign:</label><input type="number" id="page" value="1" min="1">`, process: async(files, options) => { const sigFile = document.getElementById('sig').files[0]; if (!sigFile) throw new Error("Please upload a signature image."); showLoader("Embedding signature..."); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const pageNum = parseInt(options.page, 10) - 1; if (isNaN(pageNum) || pageNum < 0 || pageNum >= pdfDoc.getPageCount()) throw new Error("Invalid page number."); const sigBytes = await readFileAsArrayBuffer(sigFile); const signatureImage = sigFile.type === 'image/png' ? await pdfDoc.embedPng(sigBytes) : await pdfDoc.embedJpg(sigBytes); pdfDoc.getPages()[pageNum].drawImage(signatureImage, { x: 50, y: 100, width: 150, height: signatureImage.height/signatureImage.width*150 }); displayDownloadLink(new Blob([await pdfDoc.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'signed')); } },
                  'watermark-pdf': { title: 'Watermark PDF', desc: 'Add a text watermark.', fileType: '.pdf', multiple: false, options: () => `<label for="text">Watermark Text:</label><input type="text" id="text" value="CONFIDENTIAL">`, process: async (files, options) => { if(!options.text) throw new Error("Watermark text is required."); showLoader('Adding watermark to all pages...'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true }); const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold); for(const page of pdfDoc.getPages()) { const {width, height} = page.getSize(); page.drawText(options.text, { x: width/2 - 100, y: height/2, font, size: 50, color: rgb(0,0,0), opacity: 0.15, rotate: degrees(45) }); } displayDownloadLink(new Blob([await pdfDoc.save()], {type: 'application/pdf'}), generateOutputFilename(files[0], 'watermarked')); } },
                  'repair-pdf': { title: 'Repair PDF', desc: 'Attempt to fix and recover a corrupted PDF.', fileType: '.pdf', multiple: false, process: async(files) => { showLoader('Attempting to repair...'); const pdfDoc = await PDFDocument.load(await readFileAsArrayBuffer(files[0]), { ignoreEncryption: true, updateMetadata: false }); displayDownloadLink(new Blob([await pdfDoc.save()], { type: 'application/pdf' }), generateOutputFilename(files[0], 'repaired')); } },
@@ -934,13 +1857,15 @@
                 grid.innerHTML = '';
                 const toolOrder = [
                     'pdf-to-excel', 'excel-to-pdf', 'word-to-pdf', 'pdf-to-word', 
-                    'pdf-to-powerpoint', 'powerpoint-to-pdf', 'pdf-to-jpg', 'jpg-to-pdf', 
-                    'html-to-pdf', 'pdf-to-text', 'add-page-numbers', 'delete-pdf-pages', 'edit-pdf'
+                    'pdf-to-powerpoint', 'powerpoint-to-pdf', 'pdf-to-jpg', 'jpg-to-pdf',
+                    'html-to-pdf', 'pdf-to-text', 'add-page-numbers', 'delete-pdf-pages',
+                    'edit-pdf', 'merge-pdf', 'split-pdf', 'rearrange-pages', 
+                    'compress-pdf', 'rotate-pdf', 'protect-pdf', 'unlock-pdf',
+                    'ocr-pdf', 'searchable-pdf', 'pdf-to-pdfa', 'esign-pdf',
+                    'repair-pdf', 'edit-pdf-metadata', 'watermark-pdf'
                 ];
-                const remainingTools = Object.keys(toolImplementations).filter(key => !toolOrder.includes(key));
-                const finalOrder = toolOrder.concat(remainingTools);
 
-                finalOrder.forEach(key => {
+                toolOrder.forEach(key => {
                     const tool = toolImplementations[key];
                     if (!tool) return;
                     const card = document.createElement('div');
@@ -977,7 +1902,19 @@
                 ['dragenter','dragover','dragleave','drop'].forEach(eName=>dropArea.addEventListener(eName,e=>{e.preventDefault();e.stopPropagation()}));
                 ['dragenter','dragover'].forEach(eName=>dropArea.addEventListener(eName,()=>dropArea.classList.add('dragover')));
                 ['dragleave','drop'].forEach(eName=>dropArea.addEventListener(eName,()=>dropArea.classList.remove('dragover')));
-                dropArea.addEventListener('drop',(e)=>handleFiles(e.dataTransfer.files)); processBtn.addEventListener('click',processFiles);
+                dropArea.addEventListener('drop',(e)=>handleFiles(e.dataTransfer.files)); 
+                
+                processBtn.addEventListener('click',processFiles);
+                document.getElementById('auto-convert-btn').addEventListener('click', () => {
+                    const toolKey = toolModal.dataset.activeTool;
+                    const tool = toolImplementations[toolKey];
+                    document.getElementById('conversion-choice-container').style.display = 'none';
+                    tool.process(selectedFiles);
+                });
+                document.getElementById('manual-convert-btn').addEventListener('click', () => {
+                    initManualPdfToExcelConverter(selectedFiles[0]);
+                });
+
                 window.addEventListener('scroll',()=>document.querySelector('.header').classList.toggle('scrolled',window.scrollY>50)); document.querySelector('.hamburger').addEventListener('click',function(){this.classList.toggle('active'),document.querySelector('.mobile-nav').classList.toggle('active')});
                 document.getElementById('support-fab').addEventListener('click',()=>document.getElementById('ai-chat-modal').classList.toggle('hidden')); document.getElementById('close-chat-btn').addEventListener('click',()=>document.getElementById('ai-chat-modal').classList.toggle('hidden'));
                 document.getElementById('chat-form').addEventListener('submit', (e) => {
@@ -1011,7 +1948,10 @@
                  toolModal.querySelector('#file-input').accept = tool.fileType || ''; 
                  toolModal.querySelector('#file-input').multiple = !!tool.multiple;
                  if(tool.options) toolModal.querySelector('#tool-options').innerHTML = tool.options();
-                 document.getElementById('editor-pagination').style.display = 'none';
+                 
+                 if (tool.isExcelTool) {
+                    processBtn.style.display = 'none';
+                 }
 
                  if (tool.isVisualDeleter) {
                      processBtn.style.display = 'none';
@@ -1047,13 +1987,14 @@
                     processBtn.style.display = 'none';
                     if (!editorInstance) editorInstance = setupPdfEditor();
                  }
+                 document.getElementById('editor-pagination').style.display = 'none';
                  toolModal.dataset.activeTool = toolKey; openModal(toolModal);
              };
              const openStaticModal = (pageKey) => {
                  const pages = {
                     about: { title: "About All Tool PDF", content: "<h3>Our Mission: Secure & Simple Document Management</h3><p>We believe that powerful PDF tools should be accessible to everyone, for free. In a digital world where data privacy is paramount, we saw a need for a reliable set of tools that don't compromise your security. Our core principle is <strong>client-side processing</strong>, which means your files are never uploaded to our servers. All operations—merging, splitting, converting, and protecting—happen securely within your own browser, giving you complete privacy and peace of mind.</p><p>This platform was built for students, professionals, and anyone who needs to manage documents efficiently without the cost of expensive software or the security risks of other online tools. Our suite is designed for maximum efficiency and ease of use. No software to install, no subscriptions—just the tools you need, right when you need them.</p>" },
                     contact: { title: "Contact Us", content: `<h3>Get in Touch</h3><p>Please fill out the form below to send us a message. Your input helps us improve our service for everyone.</p><form id="contact-form" style="display: flex; flex-direction: column; gap: 15px;"><input type="text" id="contact-name" placeholder="Your Name" required style="padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);"><input type="email" id="contact-email" placeholder="Your Email" required style="padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);"><input type="text" id="contact-subject" placeholder="Subject" required style="padding: 10px; border-radius: 4px; border: 1px solid var(--border-color);"><textarea id="contact-comment" placeholder="Your Comment" rows="5" required style="padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); font-family: inherit;"></textarea><button type="submit" style="padding: 15px; background-color: var(--primary-red); color: white; border: none; border-radius: 8px; font-size: 1.1rem; cursor: pointer;">Send Message</button></form><p style="margin-top: 20px;">Alternatively, you can email us directly at: <strong><a href="mailto:alltoolpdf@gmail.com">alltoolpdf@gmail.com</a></strong></p>` },
-                    privacy: { title: "Privacy Policy", content: "<h3>1. Core Privacy Principle: No File Uploads</h3><p>Our website is engineered to operate entirely on the <strong>client-side</strong> (i.e., in your web browser). When you use our tools to process a PDF or any other file, the file is <strong>NEVER</strong> uploaded to our servers or any third-party servers. All processing happens locally on your own computer. Your files do not leave your device, ensuring complete privacy and security.</p><h3>2. Information We Do Not Collect</h3><p>Because your files are not uploaded, we do not and cannot see, collect, or store:</p><ul><li>The content of your files.</li><li>The names of your files.</li><li>Any personal data contained within your files.</li><li>Any metadata associated with your files.</li></ul><h3>3. Anonymous Analytics</h3><p>We may collect anonymous, aggregated usage data to understand how users interact with our website (e.g., which tools are most popular). This data helps us improve our services and contains no personally identifiable information. We do not track individual users or their specific activities.</p>" },
+                  privacy: { title: "Privacy Policy", content: "<h3>1. Core Privacy Principle: No File Uploads</h3><p>Our website is engineered to operate entirely on the <strong>client-side</strong> (i.e., in your web browser). When you use our tools to process a PDF or any other file, the file is <strong>NEVER</strong> uploaded to our servers or any third-party servers. All processing happens locally on your own computer. Your files do not leave your device, ensuring complete privacy and security.</p><h3>2. Information We Do Not Collect</h3><p>Because your files are not uploaded, we do not and cannot see, collect, or store:</p><ul><li>The content of your files.</li><li>The names of your files.</li><li>Any personal data contained within your files.</li><li>Any metadata associated with your files.</li></ul><h3>3. Anonymous Analytics</h3><p>We may collect anonymous, aggregated usage data to understand how users interact with our website (e.g., which tools are most popular). This data helps us improve our services and contains no personally identifiable information. We do not track individual users or their specific activities.</p>" },
                     terms: { title: "Terms and Conditions", content: `<h3>1. Acceptance of Terms</h3><p>By accessing and using this website, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by these, you should not use this service.</p><h3>2. Use of Service</h3><p>The Service is provided to you for free for personal and reasonable business use. You agree not to use the Service for any illegal or unauthorized purpose.</p><h3>3. Disclaimer of Warranty</h3><p>The Service is provided "AS IS" and "AS AVAILABLE" without warranties of any kind, whether express or implied. All Tool PDF does not warrant that the tools will function uninterrupted, be secure, or that any errors will be corrected.</p><h3>4. Limitation of Liability</h3><p>In no event shall All Tool PDF be liable for any indirect, incidental, special, or consequential damages resulting from your use of the Service, as all processing is done locally on the user's computer.</p><h3>5. Changes to Terms</h3><p>We reserve the right to modify these terms from time to time at our sole discretion. Therefore, you should review this page periodically.</p>`}
                  };
                  staticModal.querySelector('#static-modal-title').textContent = pages[pageKey].title; staticModal.querySelector('#static-modal-body').innerHTML = pages[pageKey].content;
@@ -1072,7 +2013,11 @@
                  document.getElementById('file-input').value = '';
                  document.getElementById('drop-area').style.display = 'block';
                  editorContainer.style.display = 'none';
+                 editorContainer.classList.remove('text-edit-mode');
+                 document.getElementById('text-overlays-container').innerHTML = '';
                  deletePagesViewer.style.display = 'none';
+                 document.getElementById('conversion-choice-container').style.display = 'none';
+                 document.getElementById('mc-container').style.display = 'none';
                  currentPdfDoc = null;
                  currentPageNum = 1;
                  allPageEdits.clear();
@@ -1088,23 +2033,122 @@
                  if (!currentPdfDoc || pageNum < 1 || pageNum > currentPdfDoc.numPages) return;
                  showLoader(`Loading page ${pageNum}...`);
                  const page = await currentPdfDoc.getPage(pageNum);
-                 const viewport = page.getViewport({ scale: 1.5 });
+                 const viewport = page.getViewport({ scale: 2.0 });
                  const canvas = document.getElementById('pdf-canvas');
                  const ctx = canvas.getContext('2d');
                  canvas.height = viewport.height;
                  canvas.width = viewport.width;
                  await page.render({ canvasContext: ctx, viewport }).promise;
                  
+                 const savedEdits = allPageEdits.get(pageNum) || [];
+                 editorInstance.setDrawingActions(savedEdits);
                  editorInstance.setInitialBackground();
-                 editorInstance.setDrawingActions(allPageEdits.get(pageNum) || []);
                  editorInstance.redraw();
                  
+                 const textContent = await page.getTextContent();
+                 setTimeout(() => {
+                    createTextOverlays(textContent, viewport);
+                 }, 100);
+
                  const pageIndicator = document.getElementById('page-indicator');
                  pageIndicator.textContent = `Page ${pageNum} / ${currentPdfDoc.numPages}`;
                  document.getElementById('prev-page-btn').disabled = pageNum === 1;
                  document.getElementById('next-page-btn').disabled = pageNum === currentPdfDoc.numPages;
                  hideLoader();
              };
+             
+             let activeOverlay = null;
+
+            function createTextOverlays(textContent, viewport) {
+                const container = document.getElementById('text-overlays-container');
+                container.innerHTML = ''; 
+                const canvas = document.getElementById('pdf-canvas');
+                
+                const scale = canvas.clientWidth / viewport.width;
+
+                textContent.items.forEach((item, index) => {
+                    if (item.str.trim().length === 0) return;
+                    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                    const height = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+                    const width = item.width * viewport.scale;
+                    let left = tx[4];
+                    let top = tx[5] - height;
+
+                    const overlay = document.createElement('div');
+                    overlay.className = 'editable-text-overlay';
+                    
+                    overlay.style.left = `${left * scale}px`;
+                    overlay.style.top = `${top * scale}px`;
+                    overlay.style.width = `${width * scale}px`;
+                    overlay.style.height = `${height * scale}px`;
+                    overlay.style.fontSize = `${height * scale}px`;
+                    overlay.style.lineHeight = '1';
+
+                    overlay.style.fontFamily = textContent.styles[item.fontName]?.fontFamily || "sans-serif";
+                    overlay.textContent = item.str;
+                    
+                    overlay.dataset.originalRect = JSON.stringify({ left, top, width, height, fontName: textContent.styles[item.fontName]?.fontFamily || "sans-serif" });
+
+                    overlay.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        if (editorContainer.classList.contains('text-edit-mode')) {
+                            makeEditable(overlay);
+                        }
+                    });
+                    
+                    container.appendChild(overlay);
+                });
+            }
+
+            function makeEditable(element) {
+                if (activeOverlay && activeOverlay !== element) saveText(activeOverlay, true);
+                
+                const originalRect = JSON.parse(element.dataset.originalRect);
+                const canvas = document.getElementById('pdf-canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = "white";
+
+                ctx.fillRect(originalRect.left, originalRect.top, originalRect.width, originalRect.height * 1.25);
+                
+                element.contentEditable = "true";
+                element.classList.add('editing');
+                element.focus();
+                
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                activeOverlay = element;
+                element.addEventListener('blur', () => saveText(element, true), { once: true });
+                element.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); element.blur(); } });
+            }
+
+            function saveText(element, isBlurEvent = false) {
+                if (!element) return;
+                const newText = element.textContent;
+                element.dataset.editedText = newText;
+                
+                element.contentEditable = "false";
+                element.classList.remove('editing');
+
+                if (activeOverlay === element) activeOverlay = null;
+
+                if(isBlurEvent) {
+                    const originalRect = JSON.parse(element.dataset.originalRect);
+                    const canvas = document.getElementById('pdf-canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.font = `${originalRect.height}px "${originalRect.fontName}"`;
+                    ctx.fillStyle = "black";
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(newText, originalRect.left, originalRect.top);
+                    
+                    editorInstance.setInitialBackground();
+                }
+            }
          
              const saveCurrentPageEdits = () => {
                  if(editorInstance) {
@@ -1116,6 +2160,7 @@
                          allPageEdits.delete(currentPageNum);
                      }
                  }
+                 if(activeOverlay) saveText(activeOverlay, true);
              };
          
              const goToPrevPage = () => {
@@ -1204,7 +2249,10 @@
                  const tool = toolImplementations[toolKey];
                  selectedFiles = tool.multiple ? [...selectedFiles, ...Array.from(files)] : [files[0]];
                  
-                 if (tool.isVisualDeleter) {
+                 if (tool.isExcelTool) {
+                    document.getElementById('drop-area').style.display = 'none';
+                    document.getElementById('conversion-choice-container').style.display = 'block';
+                 } else if (tool.isVisualDeleter) {
                     showLoader('Loading PDF...');
                     document.getElementById('drop-area').style.display = 'none';
                     try {
@@ -1234,9 +2282,9 @@
                         allPageEdits.clear();
          
                         editorContainer.style.display = 'flex';
-                        processBtn.textContent = 'Save & Download';
                         processBtn.disabled = false;
                         processBtn.style.display = 'block';
+                        processBtn.textContent = 'Save & Download';
                         
                         document.getElementById('editor-pagination').style.display = currentPdfDoc.numPages > 1 ? 'flex' : 'none';
                         
@@ -1257,78 +2305,108 @@
          
              const updateFileListUI = () => { const fileListContainer = document.getElementById('file-list'); fileListContainer.innerHTML = ''; selectedFiles.forEach((file, index) => { const item = document.createElement('div'); item.className = 'file-item'; item.innerHTML = `<span>${file.name}</span><button class="remove-file" data-index="${index}">&times;</button>`; fileListContainer.appendChild(item); }); processBtn.disabled = selectedFiles.length === 0; };
              
+            const parseColor = (colorStr) => {
+                if (colorStr.startsWith('#')) {
+                    const hex = colorStr.substring(1);
+                    const r = parseInt(hex.substring(0, 2), 16);
+                    const g = parseInt(hex.substring(2, 4), 16);
+                    const b = parseInt(hex.substring(4, 6), 16);
+                    return { r: r/255, g: g/255, b: b/255 };
+                }
+                const parts = colorStr.match(/\d+/g)?.map(Number);
+                if (parts && parts.length === 3) {
+                    return { r: parts[0]/255, g: parts[1]/255, b: parts[2]/255 };
+                }
+                return { r: 0, g: 0, b: 0 }; // fallback to black
+            };
+
              async function processFiles() {
                  const toolKey = toolModal.dataset.activeTool;
                  const tool = toolImplementations[toolKey];
                  
-                 if (tool.isEditor) {
-                     showLoader('Saving PDF...');
-                     saveCurrentPageEdits();
-         
-                     const existingPdfBytes = await readFileAsArrayBuffer(selectedFiles[0]);
-                     const pdfDoc = await PDFDocument.load(existingPdfBytes);
-                     
-                     for (const [pageNum, edits] of allPageEdits.entries()) {
-                         if (edits.length === 0) continue;
-                         showLoader(`Applying edits to page ${pageNum}...`);
-                         const pdfPage = pdfDoc.getPages()[pageNum - 1];
-                         
-                         const { width, height } = pdfPage.getSize();
-                         const scale = 1.5;
-                         
-                         const tempCanvas = document.createElement('canvas');
-                         tempCanvas.width = width * scale;
-                         tempCanvas.height = height * scale;
-                         const tempCtx = tempCanvas.getContext('2d');
-                         
-                         const originalPage = await currentPdfDoc.getPage(pageNum);
-                         await originalPage.render({ canvasContext: tempCtx, viewport: originalPage.getViewport({ scale }) }).promise;
+                if (tool.isEditor) {
+                    showLoader('Saving High-Quality PDF...');
+                    saveCurrentPageEdits();
+                    
+                    try {
+                        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+                        const existingPdfBytes = await readFileAsArrayBuffer(selectedFiles[0]);
+                        const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-                         edits.forEach(action => {
-                             Object.assign(tempCtx, { fillStyle: action.color, strokeStyle: action.color, lineWidth: action.size, lineCap: 'round', lineJoin: 'round' });
-                             if(action.type === 'path'){
-                                tempCtx.beginPath();
-                                tempCtx.moveTo(action.points[0].x, action.points[0].y);
-                                action.points.slice(1).forEach(p => tempCtx.lineTo(p.x, p.y));
-                                tempCtx.stroke();
-                             } else if(action.type === 'text') {
-                                tempCtx.font = `${action.italic ? 'italic ' : ''}${action.bold ? 'bold ' : ''}${action.size}px ${action.font}`;
-                                tempCtx.textAlign = 'left'; 
-                                tempCtx.textBaseline = 'top'; 
-                                tempCtx.fillText(action.text, action.x, action.y);
-                                if (action.underline) {
-                                    const textWidth = tempCtx.measureText(action.text).width;
-                                    Object.assign(tempCtx, {lineWidth: Math.max(1, Math.floor(action.size / 15)) });
-                                    tempCtx.beginPath();
-                                    tempCtx.moveTo(action.x, action.y + parseInt(action.size, 10) + 2); 
-                                    tempCtx.lineTo(action.x + textWidth, action.y + parseInt(action.size, 10) + 2);
-                                    tempCtx.stroke();
+                        const fontMapping = {
+                            "Arial": StandardFonts.Helvetica, "Verdana": StandardFonts.Helvetica, "Times New Roman": StandardFonts.TimesRoman,
+                            "Courier New": StandardFonts.Courier, "sans-serif": StandardFonts.Helvetica
+                        };
+                        
+                        const page = pdfDoc.getPages()[currentPageNum - 1];
+                        const { width: pageWidth, height: pageHeight } = page.getSize();
+                        const canvas = document.getElementById('pdf-canvas');
+                        const scaleX = pageWidth / canvas.width;
+                        const scaleY = pageHeight / canvas.height;
+                        
+                        const textOverlays = document.querySelectorAll('.editable-text-overlay');
+
+                        for (const overlay of textOverlays) {
+                            const hasEdited = overlay.dataset.editedText;
+                            if (hasEdited) {
+                                const originalRect = JSON.parse(overlay.dataset.originalRect);
+                                
+                                page.drawRectangle({
+                                    x: originalRect.left * scaleX,
+                                    y: pageHeight - (originalRect.top + originalRect.height * 1.25) * scaleY,
+                                    width: originalRect.width * scaleX,
+                                    height: originalRect.height * 1.25 * scaleY,
+                                    color: rgb(1, 1, 1),
+                                });
+                                
+                                const newText = overlay.dataset.editedText;
+                                const fontName = originalRect.fontName.includes("Times") ? StandardFonts.TimesRoman : (originalRect.fontName.includes("Courier") ? StandardFonts.Courier : StandardFonts.Helvetica);
+                                const font = await pdfDoc.embedFont(fontName);
+                                const fontSizeInPdfUnits = originalRect.height * scaleY;
+                                
+                                page.drawText(newText, {
+                                    x: originalRect.left * scaleX,
+                                    y: pageHeight - ((originalRect.top + originalRect.height * 0.9) * scaleY),
+                                    font: font,
+                                    size: fontSizeInPdfUnits,
+                                    color: rgb(0, 0, 0),
+                                });
+                            }
+                        }
+                        
+                        if (allPageEdits.has(currentPageNum)) {
+                            const drawings = allPageEdits.get(currentPageNum);
+                            for(const action of drawings){
+                                if (!action.color || action.type === 'erase') continue;
+                                const color = parseColor(action.color);
+
+                                if(action.type === 'text'){
+                                    const font = await pdfDoc.embedFont(fontMapping[action.font] || StandardFonts.Helvetica);
+                                    page.drawText(action.text, {
+                                        x: action.x * scaleX,
+                                        y: pageHeight - (action.y + action.size * 0.9) * scaleY,
+                                        font,
+                                        size: action.size * scaleY,
+                                        color: rgb(color.r, color.g, color.b)
+                                    });
                                 }
-                             } else if (['line','rectangle','circle'].includes(action.type)) {
-                                 tempCtx.beginPath();
-                                 if (action.type === 'line') { tempCtx.moveTo(action.startX, action.startY); tempCtx.lineTo(action.endX, action.endY); } 
-                                 else if (action.type === 'rectangle') { tempCtx.rect(action.startX, startY, action.endX - action.startX, action.endY - action.startY); } 
-                                 else if (action.type === 'circle') { 
-                                     const radiusX = Math.abs(action.endX - action.startX) / 2, radiusY = Math.abs(action.endY - startY) / 2;
-                                     const centerX = action.startX + (action.endX - startX) / 2, centerY = startY + (y - startY)/2;
-                                     tempCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI); 
-                                 }
-                                 action.fill ? tempCtx.fill() : tempCtx.stroke();
-                             }
-                         });
-                         
-                         const dataUrl = tempCanvas.toDataURL('image/png');
-                         const pngImage = await pdfDoc.embedPng(dataUrl);
-                         pdfPage.drawImage(pngImage, { x: 0, y: 0, width: pdfPage.getWidth(), height: pdfPage.getHeight() });
-                     }
-         
-                     outputArea.innerHTML = '';
-                     displayDownloadLink(new Blob([await pdfDoc.save()], { type: 'application/pdf' }), generateOutputFilename(selectedFiles[0], 'edited'));
-                     processBtn.style.display = 'none';
-                     editorContainer.style.display = 'none';
-                     hideLoader();
-                     return;
-                 }
+                            }
+                        }
+
+                        outputArea.innerHTML = '';
+                        const pdfBytes = await pdfDoc.save();
+                        displayDownloadLink(new Blob([pdfBytes], { type: 'application/pdf' }), generateOutputFilename(selectedFiles[0], 'edited'));
+
+                        document.getElementById('pdf-editor-container').style.display = 'none';
+                        document.getElementById('process-btn').style.display = 'none';
+
+                    } catch (e) {
+                        showError("High-quality PDF save karne mein masla hua: " + e.message);
+                    } finally {
+                        hideLoader();
+                    }
+                    return;
+                }
          
                  if (tool.process) {
                      try {
