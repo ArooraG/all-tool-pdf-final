@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V31.0 - Advanced Excel Logic Fix ==
+# == FINAL STABLE PRODUCTION VERSION V32.0 - Reverted to Stable Excel Logic ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -62,65 +62,65 @@ def pdf_to_excel():
     try:
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        all_tables_data = []
+        all_pages_data = []
 
         for page in doc:
-            # Extract words with their coordinates
             words = page.get_text("words")
             if not words:
                 continue
 
-            # A more robust way to group words into lines
-            # Group words by their block and line number
-            blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_DICT & ~fitz.TEXT_PRESERVE_IMAGES)["blocks"]
-            lines = []
-            for b in blocks:
-                for l in b["lines"]:
-                    line_words = []
-                    for s in l["spans"]:
-                        for w in s["chars"]: # 'chars' in this context are words when extracted this way
-                            line_words.append({
-                                'text': w['c'],
-                                'x0': w['bbox'][0],
-                                'x1': w['bbox'][2]
-                            })
-                    # Sort words in a line by their horizontal position
-                    line_words.sort(key=lambda w: w['x0'])
-                    lines.append(line_words)
+            # Group words into lines based on their vertical alignment
+            lines = {}
+            for w in words:
+                y1 = round(w[3])
+                line_key = None
+                for key in lines.keys():
+                    if abs(key - y1) < 4:
+                        line_key = key
+                        break
+                
+                if line_key is None:
+                    lines[y1] = [w]
+                else:
+                    lines[line_key].append(w)
             
-            # Now, process these structured lines to create rows and cells
-            page_data = []
-            for line in lines:
-                if not line: continue
+            # Sort lines vertically
+            sorted_line_keys = sorted(lines.keys())
+            
+            # Process each line to create cells and rows
+            for key in sorted_line_keys:
+                line_words = sorted(lines[key], key=lambda w: w[0])
+                
+                if not line_words: continue
+                
                 row = []
-                current_cell_text = line[0]['text']
-                last_x1 = line[0]['x1']
+                current_cell_text = line_words[0][4]
+                last_x1 = line_words[0][2]
                 
-                for i in range(1, len(line)):
-                    word_info = line[i]
-                    space_between = word_info['x0'] - last_x1
+                for i in range(1, len(line_words)):
+                    word_info = line_words[i]
+                    space_between = word_info[0] - last_x1
                     
-                    # Heuristic to decide if it's a new cell
-                    # A larger space (e.g., > 10 points) suggests a new column
-                    if space_between > 10:
-                        row.append(current_cell_text)
-                        current_cell_text = word_info['text']
+                    if space_between > 8:
+                        row.append(current_cell_text.strip())
+                        current_cell_text = word_info[4]
                     else:
-                        current_cell_text += " " + word_info['text']
+                        if current_cell_text:
+                           current_cell_text += " " + word_info[4]
+                        else:
+                           current_cell_text = word_info[4]
                     
-                    last_x1 = word_info['x1']
+                    last_x1 = word_info[2]
                 
-                row.append(current_cell_text) # Add the last cell
-                page_data.append(row)
-            
-            all_tables_data.extend(page_data)
+                row.append(current_cell_text.strip())
+                all_pages_data.append(row)
 
         doc.close()
         
-        if not all_tables_data: return jsonify({"error": "No structured text data could be extracted from the PDF."}), 400
+        if not all_pages_data:
+            return jsonify({"error": "No text data was extracted from the PDF."}), 400
         
-        # Convert to DataFrame and then to Excel
-        df = pd.DataFrame(all_tables_data)
+        df = pd.DataFrame(all_pages_data)
         output_buffer = BytesIO()
         with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
             df.to_excel(writer, sheet_name='Extracted_Data', index=False, header=False)
@@ -128,9 +128,10 @@ def pdf_to_excel():
         
         excel_filename = os.path.splitext(file.filename)[0] + '.xlsx'
         return send_file(output_buffer, as_attachment=True, download_name=excel_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            
     except Exception as e:
-        print(f"Error during Excel conversion: {str(e)}") # For server-side debugging
-        return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}"}), 500
+        print(f"Error during Excel conversion: {str(e)}")
+        return jsonify({"error": f"An error occurred during Excel conversion. Details: {str(e)}"}), 500
 
 
 @app.route('/word-to-pdf', methods=['POST'])
