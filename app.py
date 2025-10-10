@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic ==
+# == FINAL STABLE PRODUCTION VERSION V31.0 - Advanced Excel Logic Fix ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -62,69 +62,74 @@ def pdf_to_excel():
     try:
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        all_pages_data = []
+        all_tables_data = []
 
         for page in doc:
-            # Get words and group them by lines more efficiently
+            # Extract words with their coordinates
             words = page.get_text("words")
-            if not words: continue
+            if not words:
+                continue
 
-            # Group words by their vertical position (y0)
-            lines = {}
-            for w in words:
-                y0 = round(w[1])
-                lines.setdefault(y0, []).append(w)
-
-            # Sort lines by vertical position
-            sorted_lines = sorted(lines.items())
+            # A more robust way to group words into lines
+            # Group words by their block and line number
+            blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_DICT & ~fitz.TEXT_PRESERVE_IMAGES)["blocks"]
+            lines = []
+            for b in blocks:
+                for l in b["lines"]:
+                    line_words = []
+                    for s in l["spans"]:
+                        for w in s["chars"]: # 'chars' in this context are words when extracted this way
+                            line_words.append({
+                                'text': w['c'],
+                                'x0': w['bbox'][0],
+                                'x1': w['bbox'][2]
+                            })
+                    # Sort words in a line by their horizontal position
+                    line_words.sort(key=lambda w: w['x0'])
+                    lines.append(line_words)
             
-            # Merge nearby lines
-            merged_lines = []
-            if sorted_lines:
-                current_line_words = sorted_lines[0][1]
-                last_y = sorted_lines[0][0]
-                for y, words_in_line in sorted_lines[1:]:
-                    if abs(y - last_y) < 5:  # Tolerance for merging lines
-                        current_line_words.extend(words_in_line)
-                    else:
-                        merged_lines.append(sorted(current_line_words, key=lambda w: w[0]))
-                        current_line_words = words_in_line
-                    last_y = y
-                merged_lines.append(sorted(current_line_words, key=lambda w: w[0]))
-
-            # Process each merged line to form rows
-            for line_words in merged_lines:
-                if not line_words: continue
+            # Now, process these structured lines to create rows and cells
+            page_data = []
+            for line in lines:
+                if not line: continue
                 row = []
-                current_cell = line_words[0][4]
-                last_x1 = line_words[0][2]
-                for i in range(1, len(line_words)):
-                    word = line_words[i]
-                    space = word[0] - last_x1
-                    if space > 15:  # Space threshold to define a new cell
-                        row.append(current_cell)
-                        current_cell = word[4]
+                current_cell_text = line[0]['text']
+                last_x1 = line[0]['x1']
+                
+                for i in range(1, len(line)):
+                    word_info = line[i]
+                    space_between = word_info['x0'] - last_x1
+                    
+                    # Heuristic to decide if it's a new cell
+                    # A larger space (e.g., > 10 points) suggests a new column
+                    if space_between > 10:
+                        row.append(current_cell_text)
+                        current_cell_text = word_info['text']
                     else:
-                        current_cell += " " + word[4]
-                    last_x1 = word[2]
-                row.append(current_cell)
-                all_pages_data.append(row)
+                        current_cell_text += " " + word_info['text']
+                    
+                    last_x1 = word_info['x1']
+                
+                row.append(current_cell_text) # Add the last cell
+                page_data.append(row)
+            
+            all_tables_data.extend(page_data)
 
         doc.close()
         
-        if not all_pages_data: return jsonify({"error": "No text data was extracted from the PDF."}), 400
+        if not all_tables_data: return jsonify({"error": "No structured text data could be extracted from the PDF."}), 400
         
-        df = pd.DataFrame(all_pages_data)
+        # Convert to DataFrame and then to Excel
+        df = pd.DataFrame(all_tables_data)
         output_buffer = BytesIO()
         with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='All_Pages_Data', index=False, header=False)
+            df.to_excel(writer, sheet_name='Extracted_Data', index=False, header=False)
         output_buffer.seek(0)
         
         excel_filename = os.path.splitext(file.filename)[0] + '.xlsx'
         return send_file(output_buffer, as_attachment=True, download_name=excel_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
-        # For debugging, you can print the error
-        print(f"Error during Excel conversion: {str(e)}")
+        print(f"Error during Excel conversion: {str(e)}") # For server-side debugging
         return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}"}), 500
 
 
@@ -147,7 +152,6 @@ def convert_with_libreoffice(file, output_format):
     input_path = get_safe_filepath(file.filename)
     output_path = None
     output_dir = os.path.abspath(UPLOAD_FOLDER)
-    # Define a unique user profile directory to avoid conflicts
     user_profile_dir = os.path.abspath(os.path.join(UPLOAD_FOLDER, 'libreoffice_profile'))
     if not os.path.exists(user_profile_dir):
         os.makedirs(user_profile_dir)
@@ -157,14 +161,12 @@ def convert_with_libreoffice(file, output_format):
     command = ['soffice', user_profile_arg, '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
     try:
         file.save(input_path)
-        # Increased timeout for potentially large files on slow servers
         result = subprocess.run(command, check=True, timeout=180, capture_output=True, text=True)
         
         output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format.split(":")[0]}'
         output_path = get_safe_filepath(output_filename)
         
         if not os.path.exists(output_path):
-            # Provide more detailed error logging on the server side
             print(f"LibreOffice command: {' '.join(command)}")
             print(f"LibreOffice stdout: {result.stdout}")
             print(f"LibreOffice stderr: {result.stderr}")
