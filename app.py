@@ -1,7 +1,5 @@
---- START OF FILE app.py ---
-
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V31.0 - Optimized Excel & Enhanced Word Logic ==
+# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -14,16 +12,8 @@ import subprocess
 from werkzeug.utils import secure_filename
 import mimetypes
 from docx import Document
-from docx.shared import Inches # For image size in Word
-
-# --- NEW: Import Camelot for advanced PDF to Excel ---
-try:
-    import camelot
-except ImportError:
-    print("Warning: 'camelot-py' not installed. PDF to Excel Advanced will not work.")
-    print("Please install with: pip install \"camelot-py[cv]\"")
-    camelot = None
-
+import numpy as np # Added for numerical operations in Excel conversion
+from collections import defaultdict # Added for easier grouping in Excel conversion
 
 app = Flask(__name__)
 CORS(app)
@@ -37,16 +27,17 @@ def get_safe_filepath(filename):
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
 # --- PDF to Word METHOD 1: High-Quality (LibreOffice) ---
-# This method relies on external LibreOffice installation for best fidelity including images and formatting.
 @app.route('/pdf-to-word-premium', methods=['POST'])
 def pdf_to_word_premium():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
+    # LibreOffice generally handles text and images well.
+    # Ensure LibreOffice is installed and configured correctly on the server.
+    # For very complex PDFs, conversion quality may vary.
     return convert_with_libreoffice(file, "docx")
 
-# --- PDF to Word METHOD 2: Basic Fallback (In-Memory with Image Extraction) ---
-# This method extracts text and images sequentially, but may not preserve complex layouts.
+# --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
@@ -56,42 +47,9 @@ def pdf_to_word_basic():
         pdf_bytes = file.read()
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         word_doc = Document()
-
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            
-            # Extract and add text
-            text = page.get_text("text")
-            if text.strip():
-                word_doc.add_paragraph(text)
-            
-            # Extract and add images
-            images = page.get_images(full=True)
-            for img_index, img in enumerate(images):
-                xref = img[0]
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
-
-                # Save image to a temporary buffer and add to Word document
-                try:
-                    # Ensure we have a common image format, e.g., PNG or JPEG
-                    if image_ext.lower() in ['jpeg', 'png', 'bmp', 'tiff', 'jpg']: # Added 'jpg'
-                        img_stream = BytesIO(image_bytes)
-                        # Adjust width for better fit, 6 inches is a common default
-                        word_doc.add_picture(img_stream, width=Inches(6)) 
-                        word_doc.add_paragraph(f"--- Image {img_index+1} from Page {page_num+1} ---")
-                    else:
-                        print(f"Skipping unsupported image format: {image_ext} on page {page_num+1}")
-                        word_doc.add_paragraph(f"[Image {img_index+1} from Page {page_num+1} skipped (unsupported format: {image_ext})]")
-                except Exception as img_e:
-                    print(f"Error adding image {img_index+1} from page {page_num+1}: {img_e}")
-                    word_doc.add_paragraph(f"[Could not insert image {img_index+1} from Page {page_num+1}]")
-
-            # Add a page break in Word to visually separate content from different PDF pages
-            if page_num < len(doc) - 1:
-                word_doc.add_page_break()
-
+        for page in doc:
+            # This basic method extracts text only, it does not handle images or complex layouts.
+            word_doc.add_paragraph(page.get_text("text"))
         doc.close()
         doc_buffer = BytesIO()
         word_doc.save(doc_buffer)
@@ -99,54 +57,161 @@ def pdf_to_word_basic():
         docx_filename = os.path.splitext(file.filename)[0] + '.docx'
         return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     except Exception as e:
-        print(f"Error during basic Word conversion: {str(e)}")
         return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
 
-
-# --- PDF to Excel (Advanced using Camelot) ---
-# This new method uses Camelot for robust table extraction, preventing unintended cell merging.
+# --- Other Converters ---
 @app.route('/pdf-to-excel', methods=['POST'])
 def pdf_to_excel():
-    if not camelot:
-        return jsonify({"error": "Camelot library not found. Please install with: pip install \"camelot-py[cv]\""}), 500
-
     if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
-    
-    input_pdf_path = None
     try:
-        input_pdf_path = get_safe_filepath(file.filename)
-        file.save(input_pdf_path)
+        pdf_bytes = file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        all_pages_data = []
 
-        # Use Camelot to extract tables
-        # 'flavor': 'lattice' for PDFs with lines/grids, 'stream' for PDFs without lines
-        # 'pages': 'all' to process all pages
-        # You might need to experiment with 'flavor' and 'table_areas' for best results
-        tables = camelot.read_pdf(input_pdf_path, flavor='lattice', pages='all') 
+        for page_num, page in enumerate(doc):
+            words = page.get_text("words") # [x0, y0, x1, y1, word, block_no, line_no, word_no]
+            if not words: continue
+
+            # Group words by estimated line (y-coordinate clustering)
+            line_groups = defaultdict(list)
+            
+            # Dynamic threshold for vertical clustering based on page height
+            # This helps in grouping words that are on the same visual line but have slightly different y-coords
+            line_threshold = page.rect.height / 150 
+            if line_threshold < 3: line_threshold = 3 # Minimum threshold
+
+            for w in words:
+                found_group = False
+                for y_group in list(line_groups.keys()): # Iterate over a copy to allow modification
+                    if abs(w[1] - y_group) < line_threshold:
+                        line_groups[y_group].append(w)
+                        found_group = True
+                        break
+                if not found_group:
+                    line_groups[w[1]].append(w) # Add new line group
+
+            # Consolidate line groups by averaging Y for keys and sorting
+            consolidated_lines = []
+            for y_key in sorted(line_groups.keys()):
+                words_in_group = line_groups[y_key]
+                # Calculate average y of all words in this group to represent the line's y-position
+                avg_y = sum([w[1] for w in words_in_group]) / len(words_in_group)
+                consolidated_lines.append((avg_y, words_in_group))
+            
+            # Sort by averaged Y and merge very close lines again
+            consolidated_lines.sort(key=lambda x: x[0])
+            final_lines = []
+            if consolidated_lines:
+                current_line_words = consolidated_lines[0][1]
+                last_avg_y = consolidated_lines[0][0]
+                for avg_y, words_in_line in consolidated_lines[1:]:
+                    if abs(avg_y - last_avg_y) < line_threshold: # Merge lines if they are very close
+                        current_line_words.extend(words_in_line)
+                    else:
+                        final_lines.append(sorted(current_line_words, key=lambda w: w[0]))
+                        current_line_words = words_in_line
+                    last_avg_y = avg_y
+                final_lines.append(sorted(current_line_words, key=lambda w: w[0]))
+
+            # Column detection: Analyze vertical alignment of text
+            unique_x_coords = set()
+            for line_words in final_lines:
+                for w in line_words:
+                    unique_x_coords.add(round(w[0])) # Start of word
+                    unique_x_coords.add(round(w[2])) # End of word
+            
+            unique_x_coords = sorted(list(unique_x_coords))
+
+            column_boundaries = [page.rect.x0] # Start with left page boundary
+            if len(unique_x_coords) > 1:
+                # Calculate typical text width to infer reasonable gap for a new column
+                all_word_widths = [w[2]-w[0] for line_words in final_lines for w in line_words if (w[2]-w[0]) > 0]
+                avg_word_width = np.mean(all_word_widths) if all_word_widths else 30 # Default if no words
+                
+                # Dynamic gap threshold, e.g., 1.5 times the average word width
+                dynamic_gap_threshold = max(30, avg_word_width * 1.5) # Ensure a minimum for clear separation
+
+                for i in range(len(unique_x_coords) - 1):
+                    gap = unique_x_coords[i+1] - unique_x_coords[i]
+                    if gap > dynamic_gap_threshold:
+                        # Add the midpoint of the gap as a potential column divider
+                        column_boundaries.append((unique_x_coords[i] + unique_x_coords[i+1]) / 2)
+            
+            column_boundaries.append(page.rect.x1) # End with right page boundary
+            column_boundaries = sorted(list(set(column_boundaries)))
+
+            # Further refine column boundaries - remove very close ones
+            final_column_boundaries = []
+            if column_boundaries:
+                final_column_boundaries.append(column_boundaries[0])
+                for i in range(1, len(column_boundaries)):
+                    # Minimum distance between column boundaries, adjust as needed
+                    if column_boundaries[i] - final_column_boundaries[-1] > 10: 
+                        final_column_boundaries.append(column_boundaries[i])
+            
+            if len(final_column_boundaries) < 2:
+                # Fallback to single column if column detection yields too few columns
+                # This ensures data is not lost, but might not be in perfect table format
+                if len(final_lines) > 0:
+                     single_column_data = [[" ".join([w[4] for w in line_words])] for line_words in final_lines]
+                     all_pages_data.extend(single_column_data)
+                continue
+
+
+            # Now process each line (row) using the determined column boundaries
+            for line_words in final_lines:
+                if not line_words: continue
+                row = [""] * (len(final_column_boundaries) - 1)
+                
+                # Sort words within the line by x0 to ensure correct order
+                line_words.sort(key=lambda w: w[0])
+
+                for w in line_words:
+                    word_x0 = w[0]
+                    word_x1 = w[2]
+                    word_text = w[4]
+
+                    # Assign word to the correct column based on overlap
+                    for col_idx in range(len(final_column_boundaries) - 1):
+                        col_left_bound = final_column_boundaries[col_idx]
+                        col_right_bound = final_column_boundaries[col_idx + 1]
+
+                        overlap_start = max(word_x0, col_left_bound)
+                        overlap_end = min(word_x1, col_right_bound)
+                        overlap_width = overlap_end - overlap_start
+
+                        # If word significantly overlaps with the column
+                        if overlap_width > (w[2] - w[0]) * 0.5 or (word_x0 >= col_left_bound and word_x1 <= col_right_bound):
+                            if row[col_idx]:
+                                row[col_idx] += " " + word_text
+                            else:
+                                row[col_idx] = word_text
+                            break 
+                
+                all_pages_data.append(row)
+
+        doc.close()
         
-        if not tables:
-            # Try 'stream' flavor as a fallback if 'lattice' finds nothing
-            tables = camelot.read_pdf(input_pdf_path, flavor='stream', pages='all')
-            if not tables:
-                return jsonify({"error": "No tables were detected in the PDF by Camelot using both 'lattice' and 'stream' methods."}), 400
+        if not all_pages_data: return jsonify({"error": "No text data or tables were extracted from the PDF. For complex tables, manual conversion is recommended."}), 400
         
+        # Ensure all rows have the same number of columns for DataFrame creation
+        max_cols = max(len(row) for row in all_pages_data) if all_pages_data else 0
+        normalized_data = [row + [''] * (max_cols - len(row)) for row in all_pages_data]
+
+        df = pd.DataFrame(normalized_data)
         output_buffer = BytesIO()
         with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
-            for i, table in enumerate(tables):
-                # Ensure the sheet name is valid for Excel (max 31 chars)
-                sheet_name = f'Table_Page_{table.page}_{i+1}'
-                table.df.to_excel(writer, sheet_name=sheet_name[:31], index=False, header=False) # header=False to match original request if desired
+            df.to_excel(writer, sheet_name='All_Pages_Data', index=False, header=False)
         output_buffer.seek(0)
         
-        excel_filename = os.path.splitext(file.filename)[0] + '_extracted_tables.xlsx'
-        return send_file(output_buffer, as_attachment=True, download_name=excel_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        excel_filename = os.path.splitext(file.filename)[0] + '.xlsx'
+        return send_file(output_buffer, as_attachment=True, download_name=excel_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.document')
     except Exception as e:
-        print(f"Error during advanced Excel conversion: {str(e)}")
-        return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}. Ensure Camelot and Ghostscript are installed."}), 500
-    finally:
-        if input_pdf_path and os.path.exists(input_pdf_path):
-            os.remove(input_pdf_path)
+        # For debugging, you can print the error
+        print(f"Error during Excel conversion: {str(e)}")
+        return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}. For complex tables, manual conversion is recommended."}), 500
 
 
 @app.route('/word-to-pdf', methods=['POST'])
@@ -175,44 +240,29 @@ def convert_with_libreoffice(file, output_format):
     
     user_profile_arg = f"-env:UserInstallation=file://{user_profile_dir}"
     
-    # Use 'soffice' for LibreOffice command. Adjust if 'libreoffice' is the command on your system.
     command = ['soffice', user_profile_arg, '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
-    
     try:
         file.save(input_path)
         # Increased timeout for potentially large files on slow servers
-        result = subprocess.run(command, check=True, timeout=300, capture_output=True, text=True) # Timeout increased to 300 seconds (5 min)
+        result = subprocess.run(command, check=True, timeout=180, capture_output=True, text=True)
         
-        # LibreOffice sometimes saves files with different names (e.g., adding original extension)
-        # We need to find the actual output file in the output_dir
-        expected_output_prefix = os.path.splitext(os.path.basename(input_path))[0]
-        actual_output_filename = None
-        for f_name in os.listdir(output_dir):
-            if f_name.startswith(expected_output_prefix) and f_name.endswith(f'.{output_format.split(":")[0]}'):
-                actual_output_filename = f_name
-                break
-
-        if not actual_output_filename:
+        output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format.split(":")[0]}'
+        output_path = get_safe_filepath(output_filename)
+        
+        if not os.path.exists(output_path):
+            # Provide more detailed error logging on the server side
             print(f"LibreOffice command: {' '.join(command)}")
             print(f"LibreOffice stdout: {result.stdout}")
             print(f"LibreOffice stderr: {result.stderr}")
             raise Exception("Output file was not created by LibreOffice. Check server logs for details.")
             
-        output_path = os.path.join(output_dir, actual_output_filename)
         mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
-        return send_file(output_path, as_attachment=True, download_name=actual_output_filename, mimetype=mimetype)
+        return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
     except subprocess.TimeoutExpired:
         return jsonify({"error": "The conversion process took too long and was timed out. The file might be too large or complex."}), 504
-    except subprocess.CalledProcessError as e:
-        print(f"LibreOffice conversion failed: {e.cmd}")
-        print(f"Stdout: {e.stdout}")
-        print(f"Stderr: {e.stderr}")
-        return jsonify({"error": f"LibreOffice conversion failed: {e.stderr}"}), 500
-    except FileNotFoundError:
-        return jsonify({"error": "LibreOffice ('soffice') command not found. Please ensure LibreOffice is installed and in your system's PATH."}), 500
     except Exception as e:
         print(f"An unexpected server error occurred: {str(e)}")
-        return jsonify({"error": f"An unexpected server error occurred during conversion: {str(e)}"}), 500
+        return jsonify({"error": f"An unexpected server error occurred. The server might be busy or the file is not supported."}), 500
     finally:
         try:
             if input_path and os.path.exists(input_path): os.remove(input_path)
