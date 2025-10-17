@@ -1,9 +1,8 @@
 Flask
 flask-cors
 pandas
-PyMuPDF # fitz ki library yahi hai
+PyMuPDF
 python-docx
 werkzeug
-# --- Camelot dependencies ---
 camelot-py[cv]
-# Agar ye specific version kaam na kare toh sirf camelot-py bhi try kar sakte hain.
+gunicorn # Add this line if not already present
