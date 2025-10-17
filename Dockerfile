@@ -1,8 +1,13 @@
-# Base image for your Python application
-# Aap isko badal sakte hain agar aap koi aur base image use kar rahe hain
+# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
+
+# Use a specific Python base image (recommended for stability)
+# python:3.9-slim-buster is a good choice for smaller image size
 FROM python:3.9-slim-buster
 
-# System dependencies ko update aur install karein
+# Update system packages and install external dependencies
+# LibreOffice (for document conversions)
+# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
+# ghostscript (required by Camelot for PDF processing)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice \
@@ -11,28 +16,29 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Working directory set karein
+# Set the working directory inside the container
 WORKDIR /app
 
-# requirements.txt ko copy karein aur Python dependencies install karein
+# Copy the requirements file and install Python dependencies
+# --no-cache-dir reduces the image size
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Gunicorn ko bhi install karein agar aap CMD mein use kar rahe hain
-RUN pip install gunicorn
 
-# Baaqi application files copy karein
+# If gunicorn is used in CMD, please make sure it's in requirements.txt or install it explicitly.
+# If you didn't add gunicorn to requirements.txt, uncomment the next line:
+# RUN pip install gunicorn
+
+# Copy the rest of your application code into the container
 COPY . .
 
-# Environment variables set karein
+# Set environment variables for Flask
 ENV FLASK_APP=app.py
-ENV FLASK_ENV=production # Ya development, jo aapka preference ho
+ENV FLASK_ENV=production # Use 'development' for development, 'production' for deployment
 
-# Port expose karein
+# Expose the port your application will listen on
+# Render automatically injects the $PORT environment variable
 EXPOSE 10000
 
-# Application ko run karne ki command
+# Command to run the application using Gunicorn
+# Using $PORT here so Render can inject its dynamically assigned port
 CMD gunicorn -w 4 -b 0.0.0.0:$PORT app:app
-# Render $PORT environment variable use karta hai, 10000 nahi.
-# Agar aap sirf Flask ka default run method use kar rahe hote, toh:
-# CMD ["flask", "run", "--host=0.0.0.0", "--port", "10000"]
-# Lekin gunicorn zyada production-ready hai.
