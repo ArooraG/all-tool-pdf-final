@@ -1,8 +1,9 @@
 Flask
-Flask-Cors
+flask-cors
 pandas
-PyMuPDF
-gunicorn
-requests
-xlsxwriter
+PyMuPDF # fitz ki library yahi hai
 python-docx
+werkzeug
+# --- Camelot dependencies ---
+camelot-py[cv]
+# Agar ye specific version kaam na kare toh sirf camelot-py bhi try kar sakte hain.
