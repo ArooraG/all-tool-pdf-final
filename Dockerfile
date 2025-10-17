@@ -25,10 +25,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# If gunicorn is used in CMD, please make sure it's in requirements.txt or install it explicitly.
-# If you didn't add gunicorn to requirements.txt, uncomment the next line:
-# RUN pip install gunicorn
-
 # Copy the rest of your application code into the container
 COPY . .
 
