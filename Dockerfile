@@ -1,25 +1,59 @@
-# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
+# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Python 3.10 on Ubuntu
+# Using a more robust base image (Ubuntu) for better LibreOffice compatibility
 
-# Use a specific Python base image (recommended for stability)
-# Using Python 3.10 for newer environment
-FROM python:3.10-slim-bullseye
+# Use Ubuntu 22.04 as the base image for broader compatibility with LibreOffice
+FROM ubuntu:22.04
 
-# Update system packages and install external dependencies
-# LibreOffice (for document conversions)
-# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
-# ghostscript (required by Camelot for PDF processing)
-# default-jre and libreoffice-java-common are added to resolve Java Runtime Environment issues with LibreOffice
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+# Set environment variables for non-interactive apt-get installs and Python
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYENV_ROOT="/opt/pyenv"
+ENV PATH="$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
+
+# Update system packages and install prerequisites for pyenv, Python, LibreOffice, Ghostscript
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        git \
+        libssl-dev \
+        zlib1g-dev \
+        libbz2-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        wget \
+        llvm \
+        libncursesw5-dev \
+        xz-utils \
+        tk-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        libffi-dev \
+        liblzma-dev \
+        # LibreOffice and related dependencies
         libreoffice \
         fonts-dejavu-core \
         fonts-freefont-ttf \
         fonts-liberation \
+        fonts-opensymbol \
         ghostscript \
         default-jre \
         libreoffice-java-common \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+        locales \
+    && rm -rf /var/lib/apt/lists/* && \
+    # Generate en_US.UTF-8 locale for LibreOffice
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Install pyenv
+RUN curl https://pyenv.run | bash
+
+# Install Python 3.10.12 (a stable version)
+RUN pyenv install 3.10.12 && \
+    pyenv global 3.10.12 && \
+    pip install --upgrade pip
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -30,12 +64,7 @@ ENV SAL_USE_VCLPLUGIN=gen
 ENV UNO_VERBOSE=true
 ENV URE_BOOTSTRAP_LINES=20
 
-# We removed the explicit Java setup from previous iteration as installing default-jre + libreoffice-java-common
-# should ideally be enough for LibreOffice to find Java. If issues persist, logs will tell us more.
-
-
 # Copy the requirements file and install Python dependencies
-# --no-cache-dir reduces the image size
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
