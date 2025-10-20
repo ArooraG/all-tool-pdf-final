@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.2 - PDF to Word Fallback & Messaging ==
+# == FINAL STABLE PRODUCTION VERSION V30.3 - Enhanced PDF to Word Quality Attempts ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -65,30 +65,44 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     libreoffice_convert_arg = output_format
     if output_format == "pdf" and original_file_name_for_output.lower().endswith(('.xls', '.xlsx')):
         # For Excel to PDF, force fitting to pages to avoid columns spilling over
-        # The 'FitToPages' option in calc_pdf_Export is the most relevant
-        libreoffice_convert_arg = "pdf:calc_pdf_Export:{\"FitToPages\":true}"
+        # Also added more options to preserve layout
+        libreoffice_convert_arg = "pdf:calc_pdf_Export:{\"FitToPages\":true,\"UseLosslessCompression\":true,\"ReduceImageResolution\":false,\"MaxImageResolution\":300}"
     elif output_format == "docx" and original_file_name_for_output.lower().endswith('.pdf'):
-        # For PDF to Word, use the 'writer_pdf_import' filter which attempts to preserve layout and images
-        libreoffice_convert_arg = "docx:writer_pdf_import"
+        # For PDF to Word, use the 'writer_pdf_import' filter with detailed options
+        # These options aim to preserve images, fonts, and layout as much as possible
+        libreoffice_convert_arg = "docx:writer_pdf_import:{\"EmbedFonts\":true,\"ConvertImages\":true,\"ReduceImageResolution\":false,\"MaxImageResolution\":300,\"PageNumbering\":false,\"LayoutMode\":1}"
+        # LayoutMode: 0=default, 1=exact, 2=flow (experiment with 1 for better layout retention)
     
     command = ['soffice', user_profile_arg, '--headless', '--convert-to', libreoffice_convert_arg, '--outdir', output_dir, input_path_for_conversion]
 
+    # Increased timeout for complex conversions (e.g., many images, large files)
+    LIBREOFFICE_TIMEOUT = 300 # 5 minutes
+
     try:
-        result = subprocess.run(command, check=True, timeout=180, capture_output=True, text=True)
+        result = subprocess.run(command, check=True, timeout=LIBREOFFICE_TIMEOUT, capture_output=True, text=True)
         
         # Determine the name of the output file created by LibreOffice
         # LibreOffice typically appends the new extension to the original basename
-        # output_format might be "pdf:calc_pdf_Export:..." or "docx:writer_pdf_import"
+        # actual_output_extension is derived from output_format (e.g., "docx" from "docx:writer_pdf_import")
         actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
         base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
         output_actual_filename = base_name_for_output + f'.{actual_output_extension}'
-        output_path_after_conversion = get_safe_filepath(output_actual_filename)
+        output_path_after_conversion = os.path.join(output_dir, output_actual_filename) # Use os.path.join here
+
+        # LibreOffice might create output file in unexpected ways sometimes or name it slightly differently
+        # A more robust check for the output file
+        found_output_file = False
+        for f in os.listdir(output_dir):
+            if f.startswith(base_name_for_output) and f.endswith(f'.{actual_output_extension}'):
+                output_path_after_conversion = os.path.join(output_dir, f)
+                found_output_file = True
+                break
         
-        if not os.path.exists(output_path_after_conversion):
+        if not found_output_file or not os.path.exists(output_path_after_conversion):
             print(f"LibreOffice command: {' '.join(command)}")
             print(f"LibreOffice stdout: {result.stdout}")
             print(f"LibreOffice stderr: {result.stderr}")
-            raise Exception("Output file was not created by LibreOffice. Check server logs for details.")
+            raise Exception("Output file was not created by LibreOffice. Check server logs for details. LibreOffice stderr might provide more info.")
             
         mimetype = mimetypes.guess_type(output_path_after_conversion)[0] or 'application/octet-stream'
         
@@ -99,7 +113,7 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
 
         return send_file(output_buffer, as_attachment=True, download_name=output_actual_filename, mimetype=mimetype)
     except subprocess.TimeoutExpired:
-        raise Exception("The conversion process took too long and was timed out. The file might be too large or complex.")
+        raise Exception(f"The conversion process took too long ({LIBREOFFICE_TIMEOUT}s timeout) and was terminated. The file might be too large or complex for high-quality conversion.")
     except Exception as e:
         # LibreOffice specific errors might be in stderr, capture and raise
         error_message = f"LibreOffice conversion failed: {str(e)}"
@@ -108,7 +122,9 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
             if result.stderr:
                 error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
             if "Error: source file could not be loaded" in result.stderr:
-                error_message += "\nPossible cause: PDF might be corrupted, password-protected, or malformed."
+                error_message += "\nPossible cause: The PDF might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
+            elif "Aborting" in result.stderr or "Error" in result.stderr:
+                 error_message += "\nPossible cause: LibreOffice encountered an internal error during conversion, possibly due to complex document structure or resource limits."
         
         raise Exception(error_message)
     finally:
@@ -132,31 +148,16 @@ def pdf_to_word_premium():
         # Use LibreOffice for high-quality PDF to Word conversion
         return convert_with_libreoffice(file, "docx", original_file_name_for_output=file.filename)
     except Exception as e:
-        # If premium conversion fails, raise the exception. Frontend will catch and try basic.
+        # If premium conversion fails, return a clear error. NO FALLBACK.
         print(f"Error during PDF to Word premium conversion: {str(e)}")
-        raise # Re-raise to be caught by the calling function (frontend's fetch handler)
+        return jsonify({"error": f"Failed to convert PDF to Word with high fidelity: {str(e)}. This often happens with very complex or malformed PDFs."}), 500
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
+# This route is now completely disabled as we aim for high-quality only.
+# Frontend should only call pdf-to-word-premium.
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
-    if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
-    file = request.files['file']
-    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
-    try:
-        pdf_bytes = file.read()
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        word_doc = Document()
-        for page in doc:
-            # This basic method extracts text only, it does not handle images or complex layouts.
-            word_doc.add_paragraph(page.get_text("text"))
-        doc.close()
-        doc_buffer = BytesIO()
-        word_doc.save(doc_buffer)
-        doc_buffer.seek(0)
-        docx_filename = os.path.splitext(file.filename)[0] + '.docx'
-        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    except Exception as e:
-        return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
+    return jsonify({"error": "Basic PDF to Word conversion (text-only) is not available as a direct server endpoint. Please use the premium converter for best results."}), 405
 
 
 # --- Other Converters ---
