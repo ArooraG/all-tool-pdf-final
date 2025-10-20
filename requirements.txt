@@ -1,10 +1,8 @@
---- START OF FILE requirements.txt ---
 Flask
 flask-cors
 pandas
 PyMuPDF
 python-docx
 werkzeug
-# camelot-py[cv]  <-- Is line ko remove kar den ya comment kar den
+# camelot-py[cv]
 gunicorn
---- END OF FILE requirements.txt ---

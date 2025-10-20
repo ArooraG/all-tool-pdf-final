@@ -1,4 +1,3 @@
---- START OF FILE Dockerfile ---
 # Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
 
 # Use a specific Python base image (recommended for stability)
@@ -30,7 +29,8 @@ COPY . .
 
 # Set environment variables for Flask
 ENV FLASK_APP=app.py
-ENV FLASK_ENV=production # Use 'development' for development, 'production' for deployment
+# Use 'development' for development, 'production' for deployment
+ENV FLASK_ENV=production
 
 # Expose the port your application will listen on
 # Render automatically injects the $PORT environment variable
@@ -39,4 +39,3 @@ EXPOSE 10000
 # Command to run the application using Gunicorn
 # Using $PORT here so Render can inject its dynamically assigned port
 CMD gunicorn -w 4 -b 0.0.0.0:$PORT app:app
---- END OF FILE Dockerfile ---
