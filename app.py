@@ -74,98 +74,119 @@ def pdf_to_excel():
             words = page.get_text("words") # [x0, y0, x1, y1, word, block_no, line_no, word_no]
             if not words: continue
 
-            # Group words by estimated line (y-coordinate clustering)
+            # --- Improved Line Grouping ---
             line_groups = defaultdict(list)
             
-            # Dynamic threshold for vertical clustering based on page height
-            # This helps in grouping words that are on the same visual line but have slightly different y-coords
-            line_threshold = page.rect.height / 150 
-            if line_threshold < 3: line_threshold = 3 # Minimum threshold
+            # Calculate a dynamic line threshold based on median word height on the page
+            word_heights = [w[3] - w[1] for w in words if (w[3] - w[1]) > 0] # y1 - y0
+            avg_word_height = np.median(word_heights) if word_heights else 10 # Default median height
+            
+            # Allow some vertical wiggle room, e.g., 50% of average word height. Min 3px.
+            line_clustering_threshold = max(3, avg_word_height * 0.5)
 
             for w in words:
                 found_group = False
-                for y_group in list(line_groups.keys()): # Iterate over a copy to allow modification
-                    if abs(w[1] - y_group) < line_threshold:
-                        line_groups[y_group].append(w)
+                # Use y0 (top-left y) for line grouping
+                for y_group_key in list(line_groups.keys()):
+                    if abs(w[1] - y_group_key) < line_clustering_threshold:
+                        line_groups[y_group_key].append(w)
                         found_group = True
                         break
                 if not found_group:
-                    line_groups[w[1]].append(w) # Add new line group
+                    line_groups[w[1]].append(w) # Start a new group with its y0
 
-            # Consolidate line groups by averaging Y for keys and sorting
+            # Consolidate line groups by averaging Y0 for keys and sorting
+            # This handles cases where words on the same visual line have slightly different y0 values
             consolidated_lines = []
             for y_key in sorted(line_groups.keys()):
-                words_in_group = line_groups[y_key]
-                # Calculate average y of all words in this group to represent the line's y-position
-                avg_y = sum([w[1] for w in words_in_group]) / len(words_in_group)
-                consolidated_lines.append((avg_y, words_in_group))
+                words_in_current_group = line_groups[y_key]
+                if words_in_current_group: # Ensure group is not empty
+                    avg_y0_of_group = sum([w[1] for w in words_in_current_group]) / len(words_in_current_group)
+                    consolidated_lines.append((avg_y0_of_group, words_in_current_group))
             
-            # Sort by averaged Y and merge very close lines again
+            # Sort all consolidated lines by their average y0
             consolidated_lines.sort(key=lambda x: x[0])
+            
+            # Final merge of very close lines (using the same threshold)
             final_lines = []
             if consolidated_lines:
                 current_line_words = consolidated_lines[0][1]
-                last_avg_y = consolidated_lines[0][0]
-                for avg_y, words_in_line in consolidated_lines[1:]:
-                    if abs(avg_y - last_avg_y) < line_threshold: # Merge lines if they are very close
+                last_avg_y0 = consolidated_lines[0][0]
+                for avg_y0, words_in_line in consolidated_lines[1:]:
+                    if abs(avg_y0 - last_avg_y0) < line_clustering_threshold:
                         current_line_words.extend(words_in_line)
                     else:
                         final_lines.append(sorted(current_line_words, key=lambda w: w[0]))
                         current_line_words = words_in_line
-                    last_avg_y = avg_y
+                    last_avg_y0 = avg_y0
                 final_lines.append(sorted(current_line_words, key=lambda w: w[0]))
+            # --- End Improved Line Grouping ---
 
-            # Column detection: Analyze vertical alignment of text
-            unique_x_coords = set()
-            for line_words in final_lines:
-                for w in line_words:
-                    unique_x_coords.add(round(w[0])) # Start of word
-                    unique_x_coords.add(round(w[2])) # End of word
+            # --- Improved Column Detection ---
+            all_x0_coords = sorted([w[0] for line_words in final_lines for w in line_words])
             
-            unique_x_coords = sorted(list(unique_x_coords))
-
-            column_boundaries = [page.rect.x0] # Start with left page boundary
-            if len(unique_x_coords) > 1:
-                # Calculate typical text width to infer reasonable gap for a new column
-                all_word_widths = [w[2]-w[0] for line_words in final_lines for w in line_words if (w[2]-w[0]) > 0]
-                avg_word_width = np.mean(all_word_widths) if all_word_widths else 30 # Default if no words
-                
-                # Dynamic gap threshold, e.g., 1.5 times the average word width
-                dynamic_gap_threshold = max(30, avg_word_width * 1.5) # Ensure a minimum for clear separation
-
-                for i in range(len(unique_x_coords) - 1):
-                    gap = unique_x_coords[i+1] - unique_x_coords[i]
-                    if gap > dynamic_gap_threshold:
-                        # Add the midpoint of the gap as a potential column divider
-                        column_boundaries.append((unique_x_coords[i] + unique_x_coords[i+1]) / 2)
-            
-            column_boundaries.append(page.rect.x1) # End with right page boundary
-            column_boundaries = sorted(list(set(column_boundaries)))
-
-            # Further refine column boundaries - remove very close ones
-            final_column_boundaries = []
-            if column_boundaries:
-                final_column_boundaries.append(column_boundaries[0])
-                for i in range(1, len(column_boundaries)):
-                    # Minimum distance between column boundaries, adjust as needed
-                    if column_boundaries[i] - final_column_boundaries[-1] > 10: 
-                        final_column_boundaries.append(column_boundaries[i])
-            
-            if len(final_column_boundaries) < 2:
-                # Fallback to single column if column detection yields too few columns
-                # This ensures data is not lost, but might not be in perfect table format
+            # If no words, or not enough words to form columns, handle as a single column (or skip page)
+            if not all_x0_coords:
                 if len(final_lines) > 0:
                      single_column_data = [[" ".join([w[4] for w in line_words])] for line_words in final_lines]
                      all_pages_data.extend(single_column_data)
                 continue
 
+            # Cluster x0 coordinates to find potential column start boundaries
+            column_x_candidates = []
+            # A small tolerance for x-coordinates to be considered "aligned"
+            X_COORD_ALIGNMENT_TOLERANCE = 5 
+            
+            if all_x0_coords:
+                current_cluster_sum = all_x0_coords[0]
+                current_cluster_count = 1
+                for i in range(1, len(all_x0_coords)):
+                    if all_x0_coords[i] - all_x0_coords[i-1] < X_COORD_ALIGNMENT_TOLERANCE:
+                        current_cluster_sum += all_x0_coords[i]
+                        current_cluster_count += 1
+                    else:
+                        column_x_candidates.append(current_cluster_sum / current_cluster_count)
+                        current_cluster_sum = all_x0_coords[i]
+                        current_cluster_count = 1
+                column_x_candidates.append(current_cluster_sum / current_cluster_count) # Add the last cluster
+
+            # Include page boundaries and sorted clustered candidates
+            initial_column_boundaries = {page.rect.x0, page.rect.x1}
+            for x_cand in column_x_candidates:
+                # Add candidate if it's within the page and not too close to existing boundaries
+                if page.rect.x0 < x_cand < page.rect.x1:
+                    initial_column_boundaries.add(x_cand)
+
+            final_column_boundaries = sorted(list(initial_column_boundaries))
+
+            # Refine boundaries: remove very close ones to avoid super thin columns
+            refined_column_boundaries = []
+            MIN_COLUMN_WIDTH = 15 # Minimum pixel width for a column to be considered distinct
+            if final_column_boundaries:
+                refined_column_boundaries.append(final_column_boundaries[0])
+                for i in range(1, len(final_column_boundaries)):
+                    if final_column_boundaries[i] - refined_column_boundaries[-1] > MIN_COLUMN_WIDTH:
+                        refined_column_boundaries.append(final_column_boundaries[i])
+            
+            # If after refinement, we still have less than 2 boundaries, fall back to single column
+            if len(refined_column_boundaries) < 2:
+                if len(final_lines) > 0:
+                     single_column_data = [[" ".join([w[4] for w in line_words])] for line_words in final_lines]
+                     all_pages_data.extend(single_column_data)
+                continue
+            
+            # Use refined_column_boundaries from now on
+            final_column_boundaries = refined_column_boundaries
+            # --- End Improved Column Detection ---
 
             # Now process each line (row) using the determined column boundaries
             for line_words in final_lines:
                 if not line_words: continue
+                
+                # Initialize row with empty strings for each potential cell
                 row = [""] * (len(final_column_boundaries) - 1)
                 
-                # Sort words within the line by x0 to ensure correct order
+                # Sort words within the line by x0 to ensure correct reading order
                 line_words.sort(key=lambda w: w[0])
 
                 for w in line_words:
@@ -173,23 +194,71 @@ def pdf_to_excel():
                     word_x1 = w[2]
                     word_text = w[4]
 
-                    # Assign word to the correct column based on overlap
+                    best_col_idx = -1
+                    max_overlap_ratio = 0.0
+                    
+                    # Iterate through potential columns to find the best fit for the word
                     for col_idx in range(len(final_column_boundaries) - 1):
                         col_left_bound = final_column_boundaries[col_idx]
                         col_right_bound = final_column_boundaries[col_idx + 1]
 
+                        # Calculate overlap between word and column
                         overlap_start = max(word_x0, col_left_bound)
                         overlap_end = min(word_x1, col_right_bound)
-                        overlap_width = overlap_end - overlap_start
+                        current_overlap_width = max(0, overlap_end - overlap_start)
 
-                        # If word significantly overlaps with the column
-                        if overlap_width > (w[2] - w[0]) * 0.5 or (word_x0 >= col_left_bound and word_x1 <= col_right_bound):
-                            if row[col_idx]:
-                                row[col_idx] += " " + word_text
-                            else:
-                                row[col_idx] = word_text
-                            break 
-                
+                        word_width = w[2] - w[0]
+                        if word_width > 0:
+                            overlap_ratio = current_overlap_width / word_width
+                            
+                            # Heuristic: Assign word if it largely overlaps (e.g., > 60%) with a column,
+                            # or if its center is within the column and there's some overlap.
+                            word_center_x = (word_x0 + word_x1) / 2
+                            is_center_in_col = col_left_bound <= word_center_x <= col_right_bound
+
+                            if overlap_ratio > 0.6 or (is_center_in_col and current_overlap_width > 0):
+                                if overlap_ratio > max_overlap_ratio:
+                                    max_overlap_ratio = overlap_ratio
+                                    best_col_idx = col_idx
+                            # Edge case: If word barely overlaps, but no other strong fit.
+                            # This helps catch words near boundaries that might otherwise be skipped.
+                            elif current_overlap_width > 0 and best_col_idx == -1:
+                                best_col_idx = col_idx # Take the first one it partially overlaps
+                    
+                    # Assign the word to the determined best column
+                    if best_col_idx != -1:
+                        if row[best_col_idx]:
+                            # Add a space before concatenating if the cell already has content
+                            row[best_col_idx] += " " + word_text
+                        else:
+                            row[best_col_idx] = word_text
+                    # Fallback for words that genuinely didn't fit strongly into any defined column
+                    # Try to assign to the closest column if no strong overlap, to minimize skipped data
+                    else:
+                        min_dist_to_col = float('inf')
+                        fallback_col_idx = -1
+                        word_center_x = (word_x0 + word_x1) / 2 # Recalculate if not done above or ensure it's available
+                        for col_idx in range(len(final_column_boundaries) - 1):
+                            col_left_bound = final_column_boundaries[col_idx]
+                            col_right_bound = final_column_boundaries[col_idx + 1]
+                            
+                            # Distance to either side of the column boundary or center of column
+                            dist_to_left_col_boundary = abs(word_x0 - col_left_bound)
+                            dist_to_right_col_boundary = abs(word_x1 - col_right_bound)
+                            dist_to_center_col = abs(word_center_x - ((col_left_bound + col_right_bound) / 2))
+
+                            current_min_dist = min(dist_to_left_col_boundary, dist_to_right_col_boundary, dist_to_center_col)
+
+                            if current_min_dist < min_dist_to_col:
+                                min_dist_to_col = current_min_dist
+                                fallback_col_idx = col_idx
+                        
+                        if fallback_col_idx != -1:
+                             if row[fallback_col_idx]:
+                                 row[fallback_col_idx] += " " + word_text
+                             else:
+                                 row[fallback_col_idx] = word_text
+
                 all_pages_data.append(row)
 
         doc.close()
@@ -197,6 +266,7 @@ def pdf_to_excel():
         if not all_pages_data: return jsonify({"error": "No text data or tables were extracted from the PDF. For complex tables, manual conversion is recommended."}), 400
         
         # Ensure all rows have the same number of columns for DataFrame creation
+        # Find max_cols AFTER all_pages_data has been populated from all pages
         max_cols = max(len(row) for row in all_pages_data) if all_pages_data else 0
         normalized_data = [row + [''] * (max_cols - len(row)) for row in all_pages_data]
 
