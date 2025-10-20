@@ -1,42 +1,41 @@
-# Base image for Python applications (Python 3.10 on Debian Bookworm)
-FROM python:3.10-slim-bookworm
+# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
+
+# Use a specific Python base image (recommended for stability)
+# python:3.9-slim-bullseye is a good choice for smaller image size with a newer Debian base
+FROM python:3.9-slim-bullseye
+
+# Update system packages and install external dependencies
+# LibreOffice (for document conversions)
+# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
+# ghostscript (required by Camelot for PDF processing)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libreoffice \
+        fonts-dejavu-core \
+        ghostscript \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies required by Camelot, Ghostscript, and dos2unix
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    ghostscript \
-    libgl1-mesa-glx \
-    gcc \
-    python3-dev \
-    # Install dos2unix to fix line endings for start.sh
-    dos2unix \
-    # Clean up APT cache to reduce image size
-    && rm -rf /var/lib/apt/lists/*
+# Copy the requirements file and install Python dependencies
+# --no-cache-dir reduces the image size
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the requirements file into the container
-COPY requirements.txt /app/requirements.txt
+# Copy the rest of your application code into the container
+COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Set environment variables for Flask
+ENV FLASK_APP=app.py
+# Use 'development' for development, 'production' for deployment
+ENV FLASK_ENV=production
 
-# Create a directory for uploaded files
-RUN mkdir -p /app/uploads
-
-# Copy your application code into the container
-COPY app.py /app/app.py
-COPY start.sh /app/start.sh
-
-# Fix line endings for start.sh (CRITICAL for scripts from Windows)
-RUN dos2unix /app/start.sh
-
-# Make the start script executable
-RUN chmod +x /app/start.sh
-
-# Expose the port your Flask app will run on
+# Expose the port your application will listen on
+# Render automatically injects the $PORT environment variable
 EXPOSE 10000
 
-# Define the command to run your Flask application using gunicorn
-CMD ["/app/start.sh"]
+# Command to run the application using Gunicorn
+# Using $PORT here so Render can inject its dynamically assigned port
+CMD gunicorn -w 4 -b 0.0.0.0:$PORT app:app
