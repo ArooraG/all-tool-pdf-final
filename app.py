@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.6 - LibreOffice Output File Detection & Logs ==
+# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -14,7 +14,6 @@ import mimetypes
 from docx import Document
 import numpy as np # Added for numerical operations in Excel conversion
 from collections import defaultdict # Added for easier grouping in Excel conversion
-import openpyxl # Added for modifying XLSX print settings
 
 app = Flask(__name__)
 CORS(app)
@@ -27,171 +26,38 @@ def get_safe_filepath(filename):
     safe_filename = secure_filename(filename)
     return os.path.join(UPLOAD_FOLDER, safe_filename)
 
-# --- Universal LibreOffice Function (Refactored to handle FileStorage or file path) ---
-def convert_with_libreoffice(input_source, output_format, original_file_name_for_output=None):
-    """
-    Converts a document using LibreOffice.
-    input_source: Can be a Flask FileStorage object or a string path to a file already saved.
-    output_format: The target format (e.g., "pdf", "docx"). Can also be a LibreOffice filter string.
-    original_file_name_for_output: The original filename (e.g., "my_doc.docx") to use for naming the output.
-                                  Required if input_source is a path that's already a temp file.
-    """
-    input_path_for_conversion = None
-    should_delete_input_after = False # Flag to decide if this function should delete the input_path
-
-    if hasattr(input_source, 'filename'): # It's a Flask FileStorage object
-        file = input_source
-        input_path_for_conversion = get_safe_filepath(file.filename)
-        file.save(input_path_for_conversion)
-        should_delete_input_after = True
-        if original_file_name_for_output is None:
-            original_file_name_for_output = file.filename
-    else: # It's already a path string
-        input_path_for_conversion = input_source
-        # If no original_file_name_for_output is provided, use the basename of the input_path
-        if original_file_name_for_output is None:
-            original_file_name_for_output = os.path.basename(input_path_for_conversion)
-        # We assume the caller handles cleanup if they provided a path, unless it's an uploaded file directly passed to this function.
-
-    output_path_after_conversion = None
-    output_dir = os.path.abspath(UPLOAD_FOLDER)
-    user_profile_dir = os.path.abspath(os.path.join(UPLOAD_FOLDER, 'libreoffice_profile'))
-    if not os.path.exists(user_profile_dir):
-        os.makedirs(user_profile_dir)
-    
-    user_profile_arg = f"-env:UserInstallation=file://{user_profile_dir}"
-
-    # Determine the LibreOffice filter string based on output_format and original file type
-    libreoffice_convert_arg = output_format
-    if output_format == "pdf" and original_file_name_for_output.lower().endswith(('.xls', '.xlsx')):
-        # For Excel to PDF, force fitting to pages to avoid columns spilling over
-        # Also added more options to preserve layout
-        libreoffice_convert_arg = "pdf:calc_pdf_Export:{\"FitToPages\":true,\"UseLosslessCompression\":true,\"ReduceImageResolution\":false,\"MaxImageResolution\":300}"
-    elif output_format == "docx" and original_file_name_for_output.lower().endswith('.pdf'):
-        # For PDF to Word, use the 'writer_pdf_import' filter with detailed options
-        # These options aim to preserve images, fonts, and layout as much as possible
-        libreoffice_convert_arg = "docx:writer_pdf_import:{\"EmbedFonts\":true,\"ConvertImages\":true,\"ReduceImageResolution\":false,\"MaxImageResolution\":300,\"PageNumbering\":false,\"LayoutMode\":1}"
-        # LayoutMode: 0=default, 1=exact, 2=flow (experiment with 1 for better layout retention)
-    
-    # Adding LibreOffice logging to command
-    log_file_path = os.path.join(output_dir, "libreoffice_debug.log")
-    command = [
-        'soffice', 
-        user_profile_arg, 
-        '--headless', 
-        '--convert-to', libreoffice_convert_arg, 
-        '--outdir', output_dir, 
-        input_path_for_conversion,
-        '--log-file', log_file_path,  # Specify log file
-        '--log-level', '4'           # Verbose log level
-    ]
-
-    LIBREOFFICE_TIMEOUT = 300 # 5 minutes
-    result = None 
-
-    try:
-        print(f"Executing LibreOffice command: {' '.join(command)}")
-        result = subprocess.run(command, check=True, timeout=LIBREOFFICE_TIMEOUT, capture_output=True, text=True)
-        
-        print(f"LibreOffice stdout: {result.stdout.strip()}")
-        print(f"LibreOffice stderr: {result.stderr.strip()}")
-
-        actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
-        base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
-        
-        # Robust search for the output file
-        found_output_file = False
-        output_path_after_conversion = None
-        for f in os.listdir(output_dir):
-            # LibreOffice might append numbers or other suffixes, so we check for starts with and ends with
-            # Example: original.xlsx -> original.pdf, or original_1.pdf, original.log etc.
-            # We want 'original' + 'any_suffix' + '.pdf'
-            if f.lower().startswith(base_name_for_output.lower()) and \
-               f.lower().endswith(f'.{actual_output_extension}'.lower()) and \
-               f != os.path.basename(input_path_for_conversion): # Ensure it's not the input file itself
-                output_path_after_conversion = os.path.join(output_dir, f)
-                found_output_file = True
-                break
-        
-        if not found_output_file or not os.path.exists(output_path_after_conversion):
-            detail_error = "Output file was not created by LibreOffice."
-            if result and result.stderr:
-                detail_error += f"\nLibreOffice stderr: {result.stderr.strip()}"
-            if result and result.stdout:
-                detail_error += f"\nLibreOffice stdout: {result.stdout.strip()}"
-            # Attempt to read the debug log if it exists
-            if os.path.exists(log_file_path):
-                with open(log_file_path, 'r') as f:
-                    detail_error += f"\nLibreOffice Debug Log (from {log_file_path}):\n{f.read()}"
-            raise Exception(detail_error)
-            
-        mimetype = mimetypes.guess_type(output_path_after_conversion)[0] or 'application/octet-stream'
-        
-        with open(output_path_after_conversion, 'rb') as f:
-            output_buffer = BytesIO(f.read())
-        output_buffer.seek(0)
-
-        return send_file(output_buffer, as_attachment=True, download_name=output_actual_filename, mimetype=mimetype)
-    except subprocess.TimeoutExpired:
-        raise Exception(f"The conversion process took too long ({LIBREOFFICE_TIMEOUT}s timeout) and was terminated. The file might be too large or complex for high-quality conversion.")
-    except Exception as e:
-        error_message = f"LibreOffice conversion failed: {str(e)}"
-        if result is not None:
-            if result.stderr:
-                error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
-            if result.stdout:
-                error_message += f"\nLibreOffice stdout: {result.stdout.strip()}"
-            
-            if "Error: source file could not be loaded" in (result.stderr or ""):
-                error_message += "\nPossible cause: The document might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
-            elif "Aborting" in (result.stderr or "") or "Error" in (result.stderr or ""):
-                 error_message += "\nPossible cause: LibreOffice encountered an internal error during conversion, possibly due to complex document structure or resource limits."
-        else:
-            error_message += "\nLibreOffice subprocess failed to start or run."
-
-        # Attempt to read the debug log if it exists and append to error
-        if os.path.exists(log_file_path):
-            with open(log_file_path, 'r') as f:
-                log_content = f.read()
-                if log_content:
-                    error_message += f"\nLibreOffice Debug Log (from {log_file_path}):\n{log_content}"
-                else:
-                    error_message += f"\nLibreOffice Debug Log (from {log_file_path}): Log file created but is empty or contains no useful info."
-            try: os.remove(log_file_path) # Clean up log file
-            except OSError as ex: print(f"Error cleaning up LibreOffice log file: {ex}")
-        
-        raise Exception(error_message)
-    finally:
-        if should_delete_input_after and input_path_for_conversion and os.path.exists(input_path_for_conversion):
-            try: os.remove(input_path_for_conversion)
-            except OSError as e: print(f"Error during input file cleanup: {e}")
-        if output_path_after_conversion and os.path.exists(output_path_after_conversion):
-            try: os.remove(output_path_after_conversion)
-            except OSError as e: print(f"Error during output file cleanup: {e}")
-        # Ensure log file is removed even if other parts fail
-        if os.path.exists(log_file_path):
-            try: os.remove(log_file_path)
-            except OSError as e: print(f"Error during log file cleanup in finally block: {e}")
-
-
 # --- PDF to Word METHOD 1: High-Quality (LibreOffice) ---
 @app.route('/pdf-to-word-premium', methods=['POST'])
 def pdf_to_word_premium():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    
-    try:
-        return convert_with_libreoffice(file, "docx", original_file_name_for_output=file.filename)
-    except Exception as e:
-        print(f"Error during PDF to Word premium conversion: {str(e)}")
-        return jsonify({"error": f"Failed to convert PDF to Word with high fidelity: {str(e)}. This often happens with very complex or malformed PDFs."}), 500
+    # LibreOffice generally handles text and images well.
+    # Ensure LibreOffice is installed and configured correctly on the server.
+    # For very complex PDFs, conversion quality may vary.
+    return convert_with_libreoffice(file, "docx")
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
-    return jsonify({"error": "Basic PDF to Word conversion (text-only) is not available as a direct server endpoint. Please use the premium converter for best results."}), 405
-
+    if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
+    file = request.files['file']
+    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
+    try:
+        pdf_bytes = file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        word_doc = Document()
+        for page in doc:
+            # This basic method extracts text only, it does not handle images or complex layouts.
+            word_doc.add_paragraph(page.get_text("text"))
+        doc.close()
+        doc_buffer = BytesIO()
+        word_doc.save(doc_buffer)
+        doc_buffer.seek(0)
+        docx_filename = os.path.splitext(file.filename)[0] + '.docx'
+        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
 
 # --- Other Converters ---
 @app.route('/pdf-to-excel', methods=['POST'])
@@ -423,74 +289,56 @@ def word_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith(('.doc', '.docx')): return jsonify({"error": "Invalid file type. Please upload a Word document."}), 400
-    try:
-        return convert_with_libreoffice(file, "pdf")
-    except Exception as e:
-        print(f"Error in word-to-pdf_main: {str(e)}")
-        return jsonify({"error": f"An unexpected server error occurred during Word to PDF conversion: {str(e)}"}), 500
-
+    return convert_with_libreoffice(file, "pdf")
 
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith(('.xls', '.xlsx')): return jsonify({"error": "Invalid file type. Please upload an Excel file."}), 400
+    return convert_with_libreoffice(file, "pdf")
 
-    original_filename = file.filename
-    original_saved_path = None # Path where the original uploaded file is saved
-    adjusted_temp_path = None  # Path for potentially adjusted .xlsx file
-
+# --- Universal LibreOffice Function ---
+def convert_with_libreoffice(file, output_format):
+    input_path = get_safe_filepath(file.filename)
+    output_path = None
+    output_dir = os.path.abspath(UPLOAD_FOLDER)
+    # Define a unique user profile directory to avoid conflicts
+    user_profile_dir = os.path.abspath(os.path.join(UPLOAD_FOLDER, 'libreoffice_profile'))
+    if not os.path.exists(user_profile_dir):
+        os.makedirs(user_profile_dir)
+    
+    user_profile_arg = f"-env:UserInstallation=file://{user_profile_dir}"
+    
+    command = ['soffice', user_profile_arg, '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
     try:
-        original_saved_path = get_safe_filepath(original_filename)
-        file.save(original_saved_path) # Save the original uploaded file for processing
-
-        file_extension = os.path.splitext(original_filename)[1].lower()
-
-        if file_extension == '.xlsx':
-            try:
-                # Create a temporary path for the adjusted file
-                adjusted_filename_base = os.path.splitext(original_filename)[0]
-                adjusted_temp_path = get_safe_filepath(f"{adjusted_filename_base}_adjusted.xlsx")
-
-                workbook = openpyxl.load_workbook(original_saved_path)
-                for sheet_name in workbook.sheetnames:
-                    sheet = workbook[sheet_name]
-                    # Attempt to fit content to page width for PDF conversion
-                    # These settings generally tell LibreOffice to try and fit content
-                    sheet.page_setup.fitToPage = True
-                    sheet.page_setup.fitToWidth = 1   # Fit all columns on one page
-                    sheet.page_setup.fitToHeight = 0  # Allow height to span multiple pages if necessary
-
-                    # Optional: Adjust margins slightly for better fit, if default is too wide
-                    # sheet.page_setup.left = 0.25 # Smaller margins
-                    # sheet.page_setup.right = 0.25
-                    # sheet.page_setup.top = 0.25
-                    # sheet.page_setup.bottom = 0.25
-
-                workbook.save(adjusted_temp_path)
-                # Use the adjusted file for conversion
-                return convert_with_libreoffice(adjusted_temp_path, "pdf", original_filename)
-            except Exception as e:
-                # If openpyxl adjustment fails (e.g., corrupted .xlsx, or complex features openpyxl can't handle)
-                print(f"Warning: Failed to adjust .xlsx file with openpyxl: {e}. Attempting conversion with original file.")
-                # Fall back to original file for LibreOffice conversion
-                return convert_with_libreoffice(original_saved_path, "pdf", original_filename)
-        elif file_extension == '.xls':
-            # For older .xls files, openpyxl doesn't work. Directly convert with LibreOffice.
-            # Quality might be less consistent than .xlsx
-            return convert_with_libreoffice(original_saved_path, "pdf", original_filename)
-        else:
-            return jsonify({"error": "Unsupported file type for Excel to PDF conversion."}), 400
-
+        file.save(input_path)
+        # Increased timeout for potentially large files on slow servers
+        result = subprocess.run(command, check=True, timeout=180, capture_output=True, text=True)
+        
+        output_filename = os.path.splitext(os.path.basename(input_path))[0] + f'.{output_format.split(":")[0]}'
+        output_path = get_safe_filepath(output_filename)
+        
+        if not os.path.exists(output_path):
+            # Provide more detailed error logging on the server side
+            print(f"LibreOffice command: {' '.join(command)}")
+            print(f"LibreOffice stdout: {result.stdout}")
+            print(f"LibreOffice stderr: {result.stderr}")
+            raise Exception("Output file was not created by LibreOffice. Check server logs for details.")
+            
+        mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
+        return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "The conversion process took too long and was timed out. The file might be too large or complex."}), 504
     except Exception as e:
-        print(f"Error in excel-to-pdf_main: {str(e)}")
-        return jsonify({"error": f"An unexpected server error occurred during Excel to PDF conversion: {str(e)}"}), 500
+        print(f"An unexpected server error occurred: {str(e)}")
+        return jsonify({"error": f"An unexpected server error occurred. The server might be busy or the file is not supported."}), 500
     finally:
-        # Cleanup: remove the original uploaded file and any temporary adjusted file
-        if original_saved_path and os.path.exists(original_saved_path):
-            os.remove(original_saved_path)
-        if adjusted_temp_path and os.path.exists(adjusted_temp_path):
-            os.remove(adjusted_temp_path)
+        try:
+            if input_path and os.path.exists(input_path): os.remove(input_path)
+            if output_path and os.path.exists(output_path): os.remove(output_path)
+        except OSError as e:
+            print(f"Error during file cleanup: {e}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))

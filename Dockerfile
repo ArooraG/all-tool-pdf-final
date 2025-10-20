@@ -1,70 +1,26 @@
-# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Python 3.10 on Ubuntu
-# Using a more robust base image (Ubuntu) for better LibreOffice compatibility
+# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
 
-# Use Ubuntu 22.04 as the base image for broader compatibility with LibreOffice
-FROM ubuntu:22.04
+# Use a specific Python base image (recommended for stability)
+# python:3.9-slim-bullseye is a good choice for smaller image size with a newer Debian base
+FROM python:3.9-slim-bullseye
 
-# Set environment variables for non-interactive apt-get installs and Python
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYENV_ROOT="/opt/pyenv"
-ENV PATH="$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
-
-# Update system packages and install prerequisites for pyenv, Python, LibreOffice, Ghostscript
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        git \
-        libssl-dev \
-        zlib1g-dev \
-        libbz2-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        wget \
-        llvm \
-        libncursesw5-dev \
-        xz-utils \
-        tk-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
-        libffi-dev \
-        liblzma-dev \
-        # LibreOffice and related dependencies
+# Update system packages and install external dependencies
+# LibreOffice (for document conversions)
+# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
+# ghostscript (required by Camelot for PDF processing)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         libreoffice \
         fonts-dejavu-core \
-        fonts-freefont-ttf \
-        fonts-liberation \
-        fonts-opensymbol \
         ghostscript \
-        default-jre \
-        libreoffice-java-common \
-        locales \
-    && rm -rf /var/lib/apt/lists/* && \
-    # Generate en_US.UTF-8 locale for LibreOffice
-    locale-gen en_US.UTF-8 && \
-    update-locale LANG=en_US.UTF-8
-
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
-
-# Install pyenv
-RUN curl https://pyenv.run | bash
-
-# Install Python 3.10.12 (a stable version)
-RUN pyenv install 3.10.12 && \
-    pyenv global 3.10.12 && \
-    pip install --upgrade pip
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Configure LibreOffice to use more generic rendering (less reliance on specific display server features)
-# And set up some environment variables for memory/logging
-ENV SAL_USE_VCLPLUGIN=gen
-ENV UNO_VERBOSE=true
-ENV URE_BOOTSTRAP_LINES=20
-
 # Copy the requirements file and install Python dependencies
+# --no-cache-dir reduces the image size
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
