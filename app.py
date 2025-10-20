@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.1 - Improved PDF to Word & Excel to PDF ==
+# == FINAL STABLE PRODUCTION VERSION V30.2 - PDF to Word Fallback & Messaging ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -103,7 +103,8 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     except Exception as e:
         # LibreOffice specific errors might be in stderr, capture and raise
         error_message = f"LibreOffice conversion failed: {str(e)}"
-        if result is not None:
+        # Check if result is available and has stderr/stdout
+        if 'result' in locals() and result is not None:
             if result.stderr:
                 error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
             if "Error: source file could not be loaded" in result.stderr:
@@ -131,17 +132,31 @@ def pdf_to_word_premium():
         # Use LibreOffice for high-quality PDF to Word conversion
         return convert_with_libreoffice(file, "docx", original_file_name_for_output=file.filename)
     except Exception as e:
-        # If premium conversion fails, return a clear error instead of fallback
+        # If premium conversion fails, raise the exception. Frontend will catch and try basic.
         print(f"Error during PDF to Word premium conversion: {str(e)}")
-        return jsonify({"error": f"Failed to convert PDF to Word. {str(e)}. For simpler conversion (text only), try the basic method on the frontend."}), 500
+        raise # Re-raise to be caught by the calling function (frontend's fetch handler)
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
-# This route is now disabled on the server side as we aim for high-quality only.
-# Frontend should ideally not call this unless explicitly offering a 'text-only' option.
-# If still needed, client-side PyMuPDF text extraction would be better for privacy.
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
-    return jsonify({"error": "Basic PDF to Word conversion is currently disabled on the server. Please use the premium converter for best results."}), 405
+    if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
+    file = request.files['file']
+    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
+    try:
+        pdf_bytes = file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        word_doc = Document()
+        for page in doc:
+            # This basic method extracts text only, it does not handle images or complex layouts.
+            word_doc.add_paragraph(page.get_text("text"))
+        doc.close()
+        doc_buffer = BytesIO()
+        word_doc.save(doc_buffer)
+        doc_buffer.seek(0)
+        docx_filename = os.path.splitext(file.filename)[0] + '.docx'
+        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
 
 
 # --- Other Converters ---
