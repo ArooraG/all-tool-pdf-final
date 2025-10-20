@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.4 - LibreOffice Java & Error Handling Fixes ==
+# == FINAL STABLE PRODUCTION VERSION V30.5 - Improved LibreOffice Error Reporting ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -80,31 +80,36 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     result = None # Initialize result to None
 
     try:
+        # Debugging: Print the command being executed
+        print(f"Executing LibreOffice command: {' '.join(command)}")
         result = subprocess.run(command, check=True, timeout=LIBREOFFICE_TIMEOUT, capture_output=True, text=True)
         
+        # Debugging: Print stdout/stderr even on success for audit
+        print(f"LibreOffice stdout: {result.stdout.strip()}")
+        print(f"LibreOffice stderr: {result.stderr.strip()}")
+
         # Determine the name of the output file created by LibreOffice
-        # LibreOffice typically appends the new extension to the original basename
-        # actual_output_extension is derived from output_format (e.g., "docx" from "docx:writer_pdf_import")
         actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
         base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
         output_actual_filename = base_name_for_output + f'.{actual_output_extension}'
-        output_path_after_conversion = os.path.join(output_dir, output_actual_filename) # Use os.path.join here
+        output_path_after_conversion = os.path.join(output_dir, output_actual_filename) 
 
-        # LibreOffice might create output file in unexpected ways sometimes or name it slightly differently
-        # A more robust check for the output file
+        # More robust check for the output file, in case LibreOffice renames it slightly
         found_output_file = False
         for f in os.listdir(output_dir):
-            if f.startswith(base_name_for_output) and f.endswith(f'.{actual_output_extension}'):
+            # Check if filename starts with base_name_for_output and ends with actual_output_extension
+            if f.startswith(base_name_for_output) and f.lower().endswith(f'.{actual_output_extension}'.lower()):
                 output_path_after_conversion = os.path.join(output_dir, f)
                 found_output_file = True
                 break
         
         if not found_output_file or not os.path.exists(output_path_after_conversion):
-            print(f"LibreOffice command: {' '.join(command)}")
-            if result: # Check if result is available
-                print(f"LibreOffice stdout: {result.stdout}")
-                print(f"LibreOffice stderr: {result.stderr}")
-            raise Exception("Output file was not created by LibreOffice. Check server logs for details. LibreOffice stderr might provide more info.")
+            detail_error = "Output file was not created by LibreOffice."
+            if result and result.stderr:
+                detail_error += f"\nLibreOffice stderr: {result.stderr.strip()}"
+            if result and result.stdout:
+                detail_error += f"\nLibreOffice stdout: {result.stdout.strip()}"
+            raise Exception(detail_error)
             
         mimetype = mimetypes.guess_type(output_path_after_conversion)[0] or 'application/octet-stream'
         
@@ -117,17 +122,25 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     except subprocess.TimeoutExpired:
         raise Exception(f"The conversion process took too long ({LIBREOFFICE_TIMEOUT}s timeout) and was terminated. The file might be too large or complex for high-quality conversion.")
     except Exception as e:
-        # LibreOffice specific errors might be in stderr, capture and raise
         error_message = f"LibreOffice conversion failed: {str(e)}"
-        # Check if result is available
+        
+        # Always append stderr/stdout if available for better debugging
         if result is not None:
             if result.stderr:
                 error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
+            if result.stdout: # Sometimes stdout also has useful debug info
+                error_message += f"\nLibreOffice stdout: {result.stdout.strip()}"
+
+            # Specific checks for common LibreOffice errors
             if "Error: source file could not be loaded" in (result.stderr or ""):
                 error_message += "\nPossible cause: The document might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
             elif "Aborting" in (result.stderr or "") or "Error" in (result.stderr or ""):
                  error_message += "\nPossible cause: LibreOffice encountered an internal error during conversion, possibly due to complex document structure or resource limits."
         
+        # If result is None (e.g., initial subprocess.run call failed before even starting)
+        else:
+            error_message += "\nLibreOffice subprocess failed to start or run."
+            
         raise Exception(error_message)
     finally:
         # Cleanup: remove the input file if this function saved it, and the output file
@@ -147,16 +160,12 @@ def pdf_to_word_premium():
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
     
     try:
-        # Use LibreOffice for high-quality PDF to Word conversion
         return convert_with_libreoffice(file, "docx", original_file_name_for_output=file.filename)
     except Exception as e:
-        # If premium conversion fails, return a clear error. NO FALLBACK.
         print(f"Error during PDF to Word premium conversion: {str(e)}")
         return jsonify({"error": f"Failed to convert PDF to Word with high fidelity: {str(e)}. This often happens with very complex or malformed PDFs."}), 500
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
-# This route is now completely disabled as we aim for high-quality only.
-# Frontend should only call pdf-to-word-premium.
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
     return jsonify({"error": "Basic PDF to Word conversion (text-only) is not available as a direct server endpoint. Please use the premium converter for best results."}), 405
