@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.5 - Improved LibreOffice Error Reporting ==
+# == FINAL STABLE PRODUCTION VERSION V30.6 - LibreOffice Output File Detection & Logs ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -73,32 +73,42 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         libreoffice_convert_arg = "docx:writer_pdf_import:{\"EmbedFonts\":true,\"ConvertImages\":true,\"ReduceImageResolution\":false,\"MaxImageResolution\":300,\"PageNumbering\":false,\"LayoutMode\":1}"
         # LayoutMode: 0=default, 1=exact, 2=flow (experiment with 1 for better layout retention)
     
-    command = ['soffice', user_profile_arg, '--headless', '--convert-to', libreoffice_convert_arg, '--outdir', output_dir, input_path_for_conversion]
+    # Adding LibreOffice logging to command
+    log_file_path = os.path.join(output_dir, "libreoffice_debug.log")
+    command = [
+        'soffice', 
+        user_profile_arg, 
+        '--headless', 
+        '--convert-to', libreoffice_convert_arg, 
+        '--outdir', output_dir, 
+        input_path_for_conversion,
+        '--log-file', log_file_path,  # Specify log file
+        '--log-level', '4'           # Verbose log level
+    ]
 
-    # Increased timeout for complex conversions (e.g., many images, large files)
     LIBREOFFICE_TIMEOUT = 300 # 5 minutes
-    result = None # Initialize result to None
+    result = None 
 
     try:
-        # Debugging: Print the command being executed
         print(f"Executing LibreOffice command: {' '.join(command)}")
         result = subprocess.run(command, check=True, timeout=LIBREOFFICE_TIMEOUT, capture_output=True, text=True)
         
-        # Debugging: Print stdout/stderr even on success for audit
         print(f"LibreOffice stdout: {result.stdout.strip()}")
         print(f"LibreOffice stderr: {result.stderr.strip()}")
 
-        # Determine the name of the output file created by LibreOffice
         actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
         base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
-        output_actual_filename = base_name_for_output + f'.{actual_output_extension}'
-        output_path_after_conversion = os.path.join(output_dir, output_actual_filename) 
-
-        # More robust check for the output file, in case LibreOffice renames it slightly
+        
+        # Robust search for the output file
         found_output_file = False
+        output_path_after_conversion = None
         for f in os.listdir(output_dir):
-            # Check if filename starts with base_name_for_output and ends with actual_output_extension
-            if f.startswith(base_name_for_output) and f.lower().endswith(f'.{actual_output_extension}'.lower()):
+            # LibreOffice might append numbers or other suffixes, so we check for starts with and ends with
+            # Example: original.xlsx -> original.pdf, or original_1.pdf, original.log etc.
+            # We want 'original' + 'any_suffix' + '.pdf'
+            if f.lower().startswith(base_name_for_output.lower()) and \
+               f.lower().endswith(f'.{actual_output_extension}'.lower()) and \
+               f != os.path.basename(input_path_for_conversion): # Ensure it's not the input file itself
                 output_path_after_conversion = os.path.join(output_dir, f)
                 found_output_file = True
                 break
@@ -109,11 +119,14 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
                 detail_error += f"\nLibreOffice stderr: {result.stderr.strip()}"
             if result and result.stdout:
                 detail_error += f"\nLibreOffice stdout: {result.stdout.strip()}"
+            # Attempt to read the debug log if it exists
+            if os.path.exists(log_file_path):
+                with open(log_file_path, 'r') as f:
+                    detail_error += f"\nLibreOffice Debug Log (from {log_file_path}):\n{f.read()}"
             raise Exception(detail_error)
             
         mimetype = mimetypes.guess_type(output_path_after_conversion)[0] or 'application/octet-stream'
         
-        # Read the output file into BytesIO for sending
         with open(output_path_after_conversion, 'rb') as f:
             output_buffer = BytesIO(f.read())
         output_buffer.seek(0)
@@ -123,33 +136,42 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         raise Exception(f"The conversion process took too long ({LIBREOFFICE_TIMEOUT}s timeout) and was terminated. The file might be too large or complex for high-quality conversion.")
     except Exception as e:
         error_message = f"LibreOffice conversion failed: {str(e)}"
-        
-        # Always append stderr/stdout if available for better debugging
         if result is not None:
             if result.stderr:
                 error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
-            if result.stdout: # Sometimes stdout also has useful debug info
+            if result.stdout:
                 error_message += f"\nLibreOffice stdout: {result.stdout.strip()}"
-
-            # Specific checks for common LibreOffice errors
+            
             if "Error: source file could not be loaded" in (result.stderr or ""):
                 error_message += "\nPossible cause: The document might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
             elif "Aborting" in (result.stderr or "") or "Error" in (result.stderr or ""):
                  error_message += "\nPossible cause: LibreOffice encountered an internal error during conversion, possibly due to complex document structure or resource limits."
-        
-        # If result is None (e.g., initial subprocess.run call failed before even starting)
         else:
             error_message += "\nLibreOffice subprocess failed to start or run."
-            
+
+        # Attempt to read the debug log if it exists and append to error
+        if os.path.exists(log_file_path):
+            with open(log_file_path, 'r') as f:
+                log_content = f.read()
+                if log_content:
+                    error_message += f"\nLibreOffice Debug Log (from {log_file_path}):\n{log_content}"
+                else:
+                    error_message += f"\nLibreOffice Debug Log (from {log_file_path}): Log file created but is empty or contains no useful info."
+            try: os.remove(log_file_path) # Clean up log file
+            except OSError as ex: print(f"Error cleaning up LibreOffice log file: {ex}")
+        
         raise Exception(error_message)
     finally:
-        # Cleanup: remove the input file if this function saved it, and the output file
         if should_delete_input_after and input_path_for_conversion and os.path.exists(input_path_for_conversion):
             try: os.remove(input_path_for_conversion)
             except OSError as e: print(f"Error during input file cleanup: {e}")
         if output_path_after_conversion and os.path.exists(output_path_after_conversion):
             try: os.remove(output_path_after_conversion)
             except OSError as e: print(f"Error during output file cleanup: {e}")
+        # Ensure log file is removed even if other parts fail
+        if os.path.exists(log_file_path):
+            try: os.remove(log_file_path)
+            except OSError as e: print(f"Error during log file cleanup in finally block: {e}")
 
 
 # --- PDF to Word METHOD 1: High-Quality (LibreOffice) ---

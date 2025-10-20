@@ -24,6 +24,16 @@ RUN apt-get update \
 # Set the working directory inside the container
 WORKDIR /app
 
+# Configure LibreOffice to use more generic rendering (less reliance on specific display server features)
+# And set up some environment variables for memory/logging
+ENV SAL_USE_VCLPLUGIN=gen
+ENV UNO_VERBOSE=true
+ENV URE_BOOTSTRAP_LINES=20
+
+# We removed the explicit Java setup from previous iteration as installing default-jre + libreoffice-java-common
+# should ideally be enough for LibreOffice to find Java. If issues persist, logs will tell us more.
+
+
 # Copy the requirements file and install Python dependencies
 # --no-cache-dir reduces the image size
 COPY requirements.txt .
