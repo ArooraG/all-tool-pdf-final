@@ -134,14 +134,15 @@ def pdf_to_excel():
 
             # Cluster x0 coordinates to find potential column start boundaries
             column_x_candidates = []
-            # A small tolerance for x-coordinates to be considered "aligned"
-            X_COORD_ALIGNMENT_TOLERANCE = 5 
+            # Dynamic tolerance for x-coordinates to be considered "aligned"
+            # Using avg_word_height * 0.75 for x-alignment, minimum 5px
+            dynamic_x_alignment_tolerance = max(5, avg_word_height * 0.75) 
             
             if all_x0_coords:
                 current_cluster_sum = all_x0_coords[0]
                 current_cluster_count = 1
                 for i in range(1, len(all_x0_coords)):
-                    if all_x0_coords[i] - all_x0_coords[i-1] < X_COORD_ALIGNMENT_TOLERANCE:
+                    if all_x0_coords[i] - all_x0_coords[i-1] < dynamic_x_alignment_tolerance:
                         current_cluster_sum += all_x0_coords[i]
                         current_cluster_count += 1
                     else:
@@ -161,11 +162,14 @@ def pdf_to_excel():
 
             # Refine boundaries: remove very close ones to avoid super thin columns
             refined_column_boundaries = []
-            MIN_COLUMN_WIDTH = 15 # Minimum pixel width for a column to be considered distinct
+            # Dynamic minimum pixel width for a column to be considered distinct
+            # Using avg_word_height * 1.0 for min column width, minimum 10px
+            dynamic_min_column_width = max(10, avg_word_height * 1.0) 
+
             if final_column_boundaries:
                 refined_column_boundaries.append(final_column_boundaries[0])
                 for i in range(1, len(final_column_boundaries)):
-                    if final_column_boundaries[i] - refined_column_boundaries[-1] > MIN_COLUMN_WIDTH:
+                    if final_column_boundaries[i] - refined_column_boundaries[-1] > dynamic_min_column_width:
                         refined_column_boundaries.append(final_column_boundaries[i])
             
             # If after refinement, we still have less than 2 boundaries, fall back to single column
@@ -221,9 +225,9 @@ def pdf_to_excel():
                                     max_overlap_ratio = overlap_ratio
                                     best_col_idx = col_idx
                             # Edge case: If word barely overlaps, but no other strong fit.
-                            # This helps catch words near boundaries that might otherwise be skipped.
-                            elif current_overlap_width > 0 and best_col_idx == -1:
-                                best_col_idx = col_idx # Take the first one it partially overlaps
+                            # Try to assign to the current column if no better fit found.
+                            elif current_overlap_width > 0 and best_col_idx == -1: # if we have some overlap but no strong fit yet
+                                best_col_idx = col_idx # temporarily assign
                     
                     # Assign the word to the determined best column
                     if best_col_idx != -1:
@@ -237,20 +241,21 @@ def pdf_to_excel():
                     else:
                         min_dist_to_col = float('inf')
                         fallback_col_idx = -1
-                        word_center_x = (word_x0 + word_x1) / 2 # Recalculate if not done above or ensure it's available
+                        word_center_x = (word_x0 + word_x1) / 2
                         for col_idx in range(len(final_column_boundaries) - 1):
                             col_left_bound = final_column_boundaries[col_idx]
                             col_right_bound = final_column_boundaries[col_idx + 1]
                             
-                            # Distance to either side of the column boundary or center of column
-                            dist_to_left_col_boundary = abs(word_x0 - col_left_bound)
-                            dist_to_right_col_boundary = abs(word_x1 - col_right_bound)
-                            dist_to_center_col = abs(word_center_x - ((col_left_bound + col_right_bound) / 2))
+                            # Check if the word is entirely before or after the column
+                            if word_x1 < col_left_bound: # Word is to the left of the column
+                                dist = col_left_bound - word_x1
+                            elif word_x0 > col_right_bound: # Word is to the right of the column
+                                dist = word_x0 - col_right_bound
+                            else: # Word is within or overlapping the column (already handled by main logic)
+                                dist = 0 
 
-                            current_min_dist = min(dist_to_left_col_boundary, dist_to_right_col_boundary, dist_to_center_col)
-
-                            if current_min_dist < min_dist_to_col:
-                                min_dist_to_col = current_min_dist
+                            if dist < min_dist_to_col:
+                                min_dist_to_col = dist
                                 fallback_col_idx = col_idx
                         
                         if fallback_col_idx != -1:
