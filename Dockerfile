@@ -2,12 +2,19 @@
 
 # Use a specific Python base image (recommended for stability)
 # python:3.9-slim-buster is a good choice for smaller image size
-FROM python:3.9-slim-buster
-
-# Update system packages and install external dependencies
-# LibreOffice (for document conversions)
-# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
-# ghostscript (required by Camelot for PDF processing)
+FROM --- a/Dockerfile
++++ b/Dockerfile
+@@ -1,7 +1,7 @@
+ # Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
+ 
+ # Use a specific Python base image (recommended for stability)
+-# python:3.9-slim-buster is a good choice for smaller image size
+-FROM python:3.9-slim-buster
++# python:3.9-slim-bullseye is a good choice for smaller image size with a newer Debian base
++FROM python:3.9-slim-bullseye
+ 
+ # Update system packages and install external dependencies
+ # LibreOffice (for document conversions)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice \
