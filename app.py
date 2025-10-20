@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel & PDF to Word Logic ==
+# == FINAL STABLE PRODUCTION VERSION V30.1 - Improved PDF to Word & Excel to PDF ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -67,6 +67,9 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         # For Excel to PDF, force fitting to pages to avoid columns spilling over
         # The 'FitToPages' option in calc_pdf_Export is the most relevant
         libreoffice_convert_arg = "pdf:calc_pdf_Export:{\"FitToPages\":true}"
+    elif output_format == "docx" and original_file_name_for_output.lower().endswith('.pdf'):
+        # For PDF to Word, use the 'writer_pdf_import' filter which attempts to preserve layout and images
+        libreoffice_convert_arg = "docx:writer_pdf_import"
     
     command = ['soffice', user_profile_arg, '--headless', '--convert-to', libreoffice_convert_arg, '--outdir', output_dir, input_path_for_conversion]
 
@@ -75,7 +78,7 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         
         # Determine the name of the output file created by LibreOffice
         # LibreOffice typically appends the new extension to the original basename
-        # output_format might be "pdf:calc_pdf_Export:..." so we need to parse it
+        # output_format might be "pdf:calc_pdf_Export:..." or "docx:writer_pdf_import"
         actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
         base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
         output_actual_filename = base_name_for_output + f'.{actual_output_extension}'
@@ -98,13 +101,23 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     except subprocess.TimeoutExpired:
         raise Exception("The conversion process took too long and was timed out. The file might be too large or complex.")
     except Exception as e:
-        raise Exception(f"An unexpected server error occurred during LibreOffice conversion: {str(e)}")
+        # LibreOffice specific errors might be in stderr, capture and raise
+        error_message = f"LibreOffice conversion failed: {str(e)}"
+        if result is not None:
+            if result.stderr:
+                error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
+            if "Error: source file could not be loaded" in result.stderr:
+                error_message += "\nPossible cause: PDF might be corrupted, password-protected, or malformed."
+        
+        raise Exception(error_message)
     finally:
         # Cleanup: remove the input file if this function saved it, and the output file
         if should_delete_input_after and input_path_for_conversion and os.path.exists(input_path_for_conversion):
-            os.remove(input_path_for_conversion)
+            try: os.remove(input_path_for_conversion)
+            except OSError as e: print(f"Error during input file cleanup: {e}")
         if output_path_after_conversion and os.path.exists(output_path_after_conversion):
-            os.remove(output_path_after_conversion)
+            try: os.remove(output_path_after_conversion)
+            except OSError as e: print(f"Error during output file cleanup: {e}")
 
 
 # --- PDF to Word METHOD 1: High-Quality (LibreOffice) ---
@@ -114,31 +127,22 @@ def pdf_to_word_premium():
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
     
-    # Use the general LibreOffice converter. Improvements for quality (images, text)
-    # are handled by ensuring necessary fonts are installed in the Dockerfile.
-    return convert_with_libreoffice(file, "docx")
+    try:
+        # Use LibreOffice for high-quality PDF to Word conversion
+        return convert_with_libreoffice(file, "docx", original_file_name_for_output=file.filename)
+    except Exception as e:
+        # If premium conversion fails, return a clear error instead of fallback
+        print(f"Error during PDF to Word premium conversion: {str(e)}")
+        return jsonify({"error": f"Failed to convert PDF to Word. {str(e)}. For simpler conversion (text only), try the basic method on the frontend."}), 500
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
+# This route is now disabled on the server side as we aim for high-quality only.
+# Frontend should ideally not call this unless explicitly offering a 'text-only' option.
+# If still needed, client-side PyMuPDF text extraction would be better for privacy.
 @app.route('/pdf-to-word-basic', methods=['POST'])
 def pdf_to_word_basic():
-    if 'file' not in request.files: return jsonify({"error": "No file received."}), 400
-    file = request.files['file']
-    if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Please upload a valid PDF."}), 400
-    try:
-        pdf_bytes = file.read()
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        word_doc = Document()
-        for page in doc:
-            # This basic method extracts text only, it does not handle images or complex layouts.
-            word_doc.add_paragraph(page.get_text("text"))
-        doc.close()
-        doc_buffer = BytesIO()
-        word_doc.save(doc_buffer)
-        doc_buffer.seek(0)
-        docx_filename = os.path.splitext(file.filename)[0] + '.docx'
-        return send_file(doc_buffer, as_attachment=True, download_name=docx_filename, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    except Exception as e:
-        return jsonify({"error": f"An error occurred while creating the Word file: {str(e)}"}), 500
+    return jsonify({"error": "Basic PDF to Word conversion is currently disabled on the server. Please use the premium converter for best results."}), 405
+
 
 # --- Other Converters ---
 @app.route('/pdf-to-excel', methods=['POST'])
