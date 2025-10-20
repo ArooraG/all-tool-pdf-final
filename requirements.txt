@@ -4,5 +4,5 @@ pandas
 PyMuPDF
 python-docx
 werkzeug
-# camelot-py[cv]
 gunicorn
+xlsxwriter
