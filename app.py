@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic ==
+# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel & PDF to Word Logic ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -32,7 +32,7 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     """
     Converts a document using LibreOffice.
     input_source: Can be a Flask FileStorage object or a string path to a file already saved.
-    output_format: The target format (e.g., "pdf", "docx").
+    output_format: The target format (e.g., "pdf", "docx"). Can also be a LibreOffice filter string.
     original_file_name_for_output: The original filename (e.g., "my_doc.docx") to use for naming the output.
                                   Required if input_source is a path that's already a temp file.
     """
@@ -60,15 +60,25 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         os.makedirs(user_profile_dir)
     
     user_profile_arg = f"-env:UserInstallation=file://{user_profile_dir}"
-    command = ['soffice', user_profile_arg, '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path_for_conversion]
+
+    # Determine the LibreOffice filter string based on output_format and original file type
+    libreoffice_convert_arg = output_format
+    if output_format == "pdf" and original_file_name_for_output.lower().endswith(('.xls', '.xlsx')):
+        # For Excel to PDF, force fitting to pages to avoid columns spilling over
+        # The 'FitToPages' option in calc_pdf_Export is the most relevant
+        libreoffice_convert_arg = "pdf:calc_pdf_Export:{\"FitToPages\":true}"
+    
+    command = ['soffice', user_profile_arg, '--headless', '--convert-to', libreoffice_convert_arg, '--outdir', output_dir, input_path_for_conversion]
 
     try:
         result = subprocess.run(command, check=True, timeout=180, capture_output=True, text=True)
         
         # Determine the name of the output file created by LibreOffice
         # LibreOffice typically appends the new extension to the original basename
+        # output_format might be "pdf:calc_pdf_Export:..." so we need to parse it
+        actual_output_extension = output_format.split(":")[0] if ":" in output_format else output_format
         base_name_for_output = os.path.splitext(os.path.basename(original_file_name_for_output))[0]
-        output_actual_filename = base_name_for_output + f'.{output_format.split(":")[0]}'
+        output_actual_filename = base_name_for_output + f'.{actual_output_extension}'
         output_path_after_conversion = get_safe_filepath(output_actual_filename)
         
         if not os.path.exists(output_path_after_conversion):
@@ -103,9 +113,9 @@ def pdf_to_word_premium():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith('.pdf'): return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
-    # LibreOffice generally handles text and images well.
-    # Ensure LibreOffice is installed and configured correctly on the server.
-    # For very complex PDFs, conversion quality may vary.
+    
+    # Use the general LibreOffice converter. Improvements for quality (images, text)
+    # are handled by ensuring necessary fonts are installed in the Dockerfile.
     return convert_with_libreoffice(file, "docx")
 
 # --- PDF to Word METHOD 2: Basic Fallback (In-Memory) ---
@@ -360,7 +370,12 @@ def word_to_pdf_main():
     if 'file' not in request.files: return jsonify({"error": "No file part."}), 400
     file = request.files['file']
     if not file or not file.filename.lower().endswith(('.doc', '.docx')): return jsonify({"error": "Invalid file type. Please upload a Word document."}), 400
-    return convert_with_libreoffice(file, "pdf")
+    try:
+        return convert_with_libreoffice(file, "pdf")
+    except Exception as e:
+        print(f"Error in word-to-pdf_main: {str(e)}")
+        return jsonify({"error": f"An unexpected server error occurred during Word to PDF conversion: {str(e)}"}), 500
+
 
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf_main():

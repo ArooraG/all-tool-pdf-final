@@ -12,6 +12,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice \
         fonts-dejavu-core \
+        fonts-freefont-ttf \
+        fonts-liberation \
         ghostscript \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
