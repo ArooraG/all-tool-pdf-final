@@ -1,8 +1,8 @@
 # Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
 
 # Use a specific Python base image (recommended for stability)
-# python:3.9-slim-bullseye is a good choice for smaller image size with a newer Debian base
-FROM python:3.9-slim-bullseye
+# Using Python 3.10 for newer environment
+FROM python:3.10-slim-bullseye
 
 # Update system packages and install external dependencies
 # LibreOffice (for document conversions)
@@ -20,6 +20,14 @@ RUN apt-get update \
         libreoffice-java-common \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Explicitly enable Java in LibreOffice
+# This often helps LibreOffice detect and use the installed JRE
+# The sleep commands give LibreOffice time to start and process the command
+RUN libreoffice --headless --nologo --nofirststartwizard --norestore --accept='socket,host=localhost,port=2002;urp;StarOffice.ServiceManager' & \
+    LO_PID=$! && sleep 10 && \
+    libreoffice --headless "vnd.sun.star.script:ScriptForge.SF_Core.Basic.java_setup?language=Basic&location=application" & \
+    sleep 5 && kill $LO_PID
 
 # Set the working directory inside the container
 WORKDIR /app

@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.3 - Enhanced PDF to Word Quality Attempts ==
+# == FINAL STABLE PRODUCTION VERSION V30.4 - LibreOffice Java & Error Handling Fixes ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -77,6 +77,7 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
 
     # Increased timeout for complex conversions (e.g., many images, large files)
     LIBREOFFICE_TIMEOUT = 300 # 5 minutes
+    result = None # Initialize result to None
 
     try:
         result = subprocess.run(command, check=True, timeout=LIBREOFFICE_TIMEOUT, capture_output=True, text=True)
@@ -100,8 +101,9 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
         
         if not found_output_file or not os.path.exists(output_path_after_conversion):
             print(f"LibreOffice command: {' '.join(command)}")
-            print(f"LibreOffice stdout: {result.stdout}")
-            print(f"LibreOffice stderr: {result.stderr}")
+            if result: # Check if result is available
+                print(f"LibreOffice stdout: {result.stdout}")
+                print(f"LibreOffice stderr: {result.stderr}")
             raise Exception("Output file was not created by LibreOffice. Check server logs for details. LibreOffice stderr might provide more info.")
             
         mimetype = mimetypes.guess_type(output_path_after_conversion)[0] or 'application/octet-stream'
@@ -117,13 +119,13 @@ def convert_with_libreoffice(input_source, output_format, original_file_name_for
     except Exception as e:
         # LibreOffice specific errors might be in stderr, capture and raise
         error_message = f"LibreOffice conversion failed: {str(e)}"
-        # Check if result is available and has stderr/stdout
-        if 'result' in locals() and result is not None:
+        # Check if result is available
+        if result is not None:
             if result.stderr:
                 error_message += f"\nLibreOffice stderr: {result.stderr.strip()}"
-            if "Error: source file could not be loaded" in result.stderr:
-                error_message += "\nPossible cause: The PDF might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
-            elif "Aborting" in result.stderr or "Error" in result.stderr:
+            if "Error: source file could not be loaded" in (result.stderr or ""):
+                error_message += "\nPossible cause: The document might be corrupted, password-protected, or malformed, preventing LibreOffice from opening it."
+            elif "Aborting" in (result.stderr or "") or "Error" in (result.stderr or ""):
                  error_message += "\nPossible cause: LibreOffice encountered an internal error during conversion, possibly due to complex document structure or resource limits."
         
         raise Exception(error_message)
