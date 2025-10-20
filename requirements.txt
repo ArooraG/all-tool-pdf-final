@@ -6,3 +6,4 @@ python-docx
 werkzeug
 gunicorn
 xlsxwriter
+openpyxl
