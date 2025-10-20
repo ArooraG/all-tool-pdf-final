@@ -1,12 +1,6 @@
 #!/bin/bash
-set -e # Is line ko shamil kar len taake script mein koi bhi command fail ho to foran ruk jaye
+set -e
 
-# start.sh - Script to start the Gunicorn server
-
-# UPLOAD_FOLDER create karein agar maujood nahi hai
 mkdir -p /app/uploads
 
-# Gunicorn server start karein
-# Workers ko 1 kar dein taake memory ka masla na aaye
-# --timeout: Camelot jaisi libraries ke liye process ko lamba chalne ki ijazat deta hai
 gunicorn --timeout 300 --workers 1 --bind 0.0.0.0:$PORT app:app
