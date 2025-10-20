@@ -1,24 +1,11 @@
-#!/usr/bin/env bash
-# exit on error
-set -o errexit
+#!/bin/bash
+# start.sh - Script to start the Gunicorn server
 
-# Install Python dependencies first
-echo "Installing Python dependencies..."
-pip install -r requirements.txt
+# UPLOAD_FOLDER create karein agar maujood nahi hai
+mkdir -p /app/uploads
 
-# --- Final LibreOffice Installation for Render.com ---
-echo "Updating packages and installing LibreOffice with all dependencies..."
-apt-get update && apt-get install -y \
-    libreoffice \
-    libreoffice-pdfimport \
-    fonts-noto \
-    && apt-get clean
-
-# **THE CRITICAL FIX IS HERE**
-# Create a dedicated, writable directory for the LibreOffice user profile.
-# On Render's read-only filesystem, LibreOffice cannot create its config files.
-# This command creates a directory it can actually write to.
-echo "Creating a writable directory for LibreOffice user profile..."
-mkdir -p /opt/render/.config/libreoffice
-
-echo "Build script completed successfully. Environment is ready."
+# Gunicorn server start karein
+# -w: workers ki tadad (2-4 * CPU cores recommended)
+# -b: bind address (0.0.0.0:port)
+# app:app: aapki app.py file aur uske andar 'app' variable ka naam
+gunicorn --timeout 300 --workers 4 --bind 0.0.0.0:$PORT app:app

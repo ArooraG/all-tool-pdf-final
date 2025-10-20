@@ -1,41 +1,43 @@
-# Dockerfile for Python Flask application with LibreOffice, Ghostscript, and Camelot
-
-# Use a specific Python base image (recommended for stability)
-# python:3.9-slim-bullseye is a good choice for smaller image size with a newer Debian base
-FROM python:3.9-slim-bullseye
-
-# Update system packages and install external dependencies
-# LibreOffice (for document conversions)
-# fonts-dejavu-core (for better font rendering in LibreOffice conversions)
-# ghostscript (required by Camelot for PDF processing)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libreoffice \
-        fonts-dejavu-core \
-        ghostscript \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Base image for Python applications (Python 3.10 on Debian Bookworm)
+FROM python:3.10-slim-bookworm
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the requirements file and install Python dependencies
-# --no-cache-dir reduces the image size
+# Install system dependencies required by Camelot and Ghostscript
+# Ghostscript is crucial for Camelot to process PDFs
+# libpq-dev is for PostgreSQL, include if you plan to use a DB
+# gcc and python3-dev are for compiling some Python packages (e.g., pandas, numpy)
+# libgl1 is for headless OpenCV if camelot-py[cv] pulls it in that way
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ghostscript \
+    libgl1-mesa-glx \
+    gcc \
+    python3-dev \
+    # Clean up APT cache to reduce image size
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the requirements file into the container
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application code into the container
-COPY . .
+# Create a directory for uploaded files (if needed, though Camelot uses temp files)
+RUN mkdir -p /app/uploads
 
-# Set environment variables for Flask
-ENV FLASK_APP=app.py
-# Use 'development' for development, 'production' for deployment
-ENV FLASK_ENV=production
+# Copy your application code into the container
+COPY app.py .
+COPY start.sh . # Copy the start script
 
-# Expose the port your application will listen on
-# Render automatically injects the $PORT environment variable
+# Make the start script executable
+RUN chmod +x start.sh
+
+# Expose the port your Flask app will run on
+# Render will map this to an external port
 EXPOSE 10000
 
-# Command to run the application using Gunicorn
-# Using $PORT here so Render can inject its dynamically assigned port
-CMD gunicorn -w 4 -b 0.0.0.0:$PORT app:app
+# Define the command to run your Flask application using gunicorn
+# Render will use the command specified in its service settings or this CMD
+CMD ["./start.sh"]
