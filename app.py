@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V31.0 - Optimized Excel Logic (Camelot Integration) ==
+# == FINAL STABLE PRODUCTION VERSION V32.0 - Optimized Excel Logic (Camelot Integration with Debugging) ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -17,8 +17,10 @@ from collections import defaultdict
 
 # --- Camelot Specific Imports ---
 import camelot
+print("DEBUG: Camelot imported successfully.") # DEBUG PRINT
 
 app = Flask(__name__)
+print("DEBUG: Flask app initialized.") # DEBUG PRINT
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
@@ -72,40 +74,39 @@ def pdf_to_excel():
         # Save the uploaded PDF to a temporary file for Camelot
         temp_pdf_path = get_safe_filepath(file.filename)
         file.save(temp_pdf_path)
+        print(f"DEBUG: PDF saved to temporary path: {temp_pdf_path}") # DEBUG PRINT
 
         all_pages_data = []
         excel_filename = os.path.splitext(file.filename)[0] + '.xlsx'
 
         # Attempt to extract tables using Camelot (Lattice mode first)
         try:
-            # pages='all' will process all pages. Can specify '1,3-5' for specific pages.
-            # flavor='lattice' for tables with ruling lines
-            # process_background=True helps with tables that have shaded cells or background elements
+            print("DEBUG: Attempting Camelot extraction (lattice mode)...") # DEBUG PRINT
             tables = camelot.read_pdf(temp_pdf_path, pages='all', flavor='lattice', process_background=True)
             
             if len(tables) == 0:
-                # If no tables found in lattice mode, try stream mode
+                print("DEBUG: No tables found in lattice mode, trying stream mode...") # DEBUG PRINT
                 tables = camelot.read_pdf(temp_pdf_path, pages='all', flavor='stream', process_background=True)
             
             if len(tables) > 0:
+                print(f"DEBUG: Camelot successfully extracted {len(tables)} tables.") # DEBUG PRINT
                 for table in tables:
                     df = table.df
-                    # Convert DataFrame to list of lists (Excel rows)
                     all_pages_data.extend(df.values.tolist())
-                    # Add a separator if multiple tables are extracted, or from different pages
                     all_pages_data.append(["--- New Table / Page ---"]) 
                 
-                # Remove the last separator if it's the only one
                 if all_pages_data and all_pages_data[-1] == ["--- New Table / Page ---"]:
                     all_pages_data.pop()
 
         except Exception as camelot_e:
-            print(f"Camelot extraction failed: {str(camelot_e)}. Falling back to PyMuPDF text extraction.")
-            # If Camelot fails (e.g., Ghostscript not installed, invalid PDF for Camelot),
-            # fall back to the PyMuPDF word extraction logic
+            print(f"DEBUG: Camelot extraction failed: {str(camelot_e)}. Falling back to PyMuPDF text extraction.") # DEBUG PRINT
+            # If Camelot fails, fall back to the PyMuPDF word extraction logic
 
         if not all_pages_data: # If Camelot found nothing, or failed completely
+            print("DEBUG: Falling back to PyMuPDF word extraction.") # DEBUG PRINT
             # Re-read file content for PyMuPDF fallback as Camelot might have consumed the stream
+            # Ensure file is closed before attempting to open again
+            # We already saved it, so can directly read from the path
             pdf_bytes_for_pymu = open(temp_pdf_path, 'rb').read() 
             doc = fitz.open(stream=pdf_bytes_for_pymu, filetype="pdf")
 
@@ -270,6 +271,7 @@ def pdf_to_excel():
             doc.close()
 
         if not all_pages_data:
+            print("DEBUG: No data collected from Camelot or PyMuPDF fallback.") # DEBUG PRINT
             return jsonify({"error": "No text data or tables were extracted from the PDF. For complex tables, manual conversion is recommended."}), 400
         
         # Ensure all rows have the same number of columns for DataFrame creation
@@ -282,13 +284,15 @@ def pdf_to_excel():
             df_final.to_excel(writer, sheet_name='Extracted_Data', index=False, header=False)
         output_buffer.seek(0)
         
+        print("DEBUG: Excel file generated successfully.") # DEBUG PRINT
         return send_file(output_buffer, as_attachment=True, download_name=excel_filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.document')
     except Exception as e:
-        print(f"Error during Excel conversion: {str(e)}")
+        print(f"DEBUG: An unhandled error occurred during Excel conversion: {str(e)}") # DEBUG PRINT
         return jsonify({"error": f"An error occurred during Excel conversion: {str(e)}. For complex tables, manual conversion is recommended."}), 500
     finally:
         if temp_pdf_path and os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)
+            print(f"DEBUG: Temporary PDF file removed: {temp_pdf_path}") # DEBUG PRINT
 
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf_main():
@@ -332,16 +336,18 @@ def convert_with_libreoffice(file, output_format):
         mimetype = mimetypes.guess_type(output_path)[0] or 'application/octet-stream'
         return send_file(output_path, as_attachment=True, download_name=output_filename, mimetype=mimetype)
     except subprocess.TimeoutExpired:
+        print("DEBUG: LibreOffice conversion timed out.") # DEBUG PRINT
         return jsonify({"error": "The conversion process took too long and was timed out. The file might be too large or complex."}), 504
     except Exception as e:
-        print(f"An unexpected server error occurred: {str(e)}")
+        print(f"DEBUG: An unexpected error occurred during LibreOffice conversion: {str(e)}") # DEBUG PRINT
         return jsonify({"error": f"An unexpected server error occurred. The server might be busy or the file is not supported."}), 500
     finally:
         try:
             if input_path and os.path.exists(input_path): os.remove(input_path)
             if output_path and os.path.exists(output_path): os.remove(output_path)
+            print("DEBUG: LibreOffice temp files cleaned up.") # DEBUG PRINT
         except OSError as e:
-            print(f"Error during file cleanup: {e}")
+            print(f"DEBUG: Error during file cleanup: {e}") # DEBUG PRINT
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
