@@ -21,14 +21,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Explicitly enable Java in LibreOffice
-# This often helps LibreOffice detect and use the installed JRE
-# The sleep commands give LibreOffice time to start and process the command
-RUN libreoffice --headless --nologo --nofirststartwizard --norestore --accept='socket,host=localhost,port=2002;urp;StarOffice.ServiceManager' & \
-    LO_PID=$! && sleep 10 && \
-    libreoffice --headless "vnd.sun.star.script:ScriptForge.SF_Core.Basic.java_setup?language=Basic&location=application" & \
-    sleep 5 && kill $LO_PID
-
 # Set the working directory inside the container
 WORKDIR /app
 
