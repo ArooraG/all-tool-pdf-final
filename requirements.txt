@@ -5,6 +5,6 @@ pandas
 PyMuPDF
 python-docx
 werkzeug
-camelot-py[cv]
+# camelot-py[cv]  <-- Is line ko remove kar den ya comment kar den
 gunicorn
 --- END OF FILE requirements.txt ---
