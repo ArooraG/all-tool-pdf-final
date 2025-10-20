@@ -8,6 +8,7 @@ FROM python:3.9-slim-bullseye
 # LibreOffice (for document conversions)
 # fonts-dejavu-core (for better font rendering in LibreOffice conversions)
 # ghostscript (required by Camelot for PDF processing)
+# default-jre and libreoffice-java-common are added to resolve Java Runtime Environment issues with LibreOffice
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libreoffice \
@@ -15,6 +16,8 @@ RUN apt-get update \
         fonts-freefont-ttf \
         fonts-liberation \
         ghostscript \
+        default-jre \
+        libreoffice-java-common \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
