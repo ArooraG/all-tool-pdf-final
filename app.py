@@ -1,5 +1,5 @@
 # =====================================================================================
-# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic (Data Skip Fix) ==
+# == FINAL STABLE PRODUCTION VERSION V30.0 - Optimized Excel Logic (Table Structure Fix) ==
 # =====================================================================================
 
 from flask import Flask, request, send_file, jsonify
@@ -74,11 +74,10 @@ def pdf_to_excel():
             words = page.get_text("words") # [x0, y0, x1, y1, word, block_no, line_no, word_no]
             if not words: continue
 
-            # --- Improved Line Grouping ---
+            # --- Improved Line Grouping (Rows) ---
             line_groups = defaultdict(list)
-            
             word_heights = [w[3] - w[1] for w in words if (w[3] - w[1]) > 0]
-            avg_word_height = np.median(word_heights) if word_heights else 10
+            avg_word_height = np.median(word_heights) if word_heights else 10 # Default median height
             
             line_clustering_threshold = max(3, avg_word_height * 0.5)
 
@@ -115,49 +114,53 @@ def pdf_to_excel():
                 final_lines.append(sorted(current_line_words, key=lambda w: w[0]))
             # --- End Improved Line Grouping ---
 
-            # --- Improved Column Detection ---
-            all_x0_coords = sorted([w[0] for line_words in final_lines for w in line_words])
+            # --- Refined Column Detection ---
+            x_coords_for_columns = set()
+            for line_words in final_lines:
+                line_words.sort(key=lambda w: w[0])
+                for i, w in enumerate(line_words):
+                    x_coords_for_columns.add(w[0]) # Start of word
+                    x_coords_for_columns.add(w[2]) # End of word
+                    if i < len(line_words) - 1:
+                        gap = line_words[i+1][0] - w[2]
+                        if gap > avg_word_height * 0.8: # Consider a significant gap as a potential column divider
+                             x_coords_for_columns.add(w[2] + gap / 2) # Mid-point of the gap
             
-            if not all_x0_coords:
-                if len(final_lines) > 0:
-                     single_column_data = [[" ".join([w[4] for w in line_words])] for line_words in final_lines]
-                     all_pages_data.extend(single_column_data)
-                continue
+            blocks = page.get_text("blocks")
+            for b in blocks:
+                 x_coords_for_columns.add(b[0])
+                 x_coords_for_columns.add(b[2])
 
-            column_x_candidates = []
-            # Adjusted dynamic tolerance for x-coordinates for better column detection
-            # Make it less aggressive in grouping X-coords to detect more boundaries
-            dynamic_x_alignment_tolerance = max(3, avg_word_height * 0.3) 
+            x_coords_for_columns.add(page.rect.x0)
+            x_coords_for_columns.add(page.rect.x1)
+
+            sorted_x_candidates = sorted(list(x_coords_for_columns))
             
-            if all_x0_coords:
-                current_cluster_sum = all_x0_coords[0]
+            column_boundary_clustering_threshold = max(5, avg_word_height * 0.7) # Cluster nearby x-coordinates into a single boundary
+
+            final_column_boundaries = []
+            if sorted_x_candidates:
+                current_cluster_sum = sorted_x_candidates[0]
                 current_cluster_count = 1
-                for i in range(1, len(all_x0_coords)):
-                    if all_x0_coords[i] - all_x0_coords[i-1] < dynamic_x_alignment_tolerance:
-                        current_cluster_sum += all_x0_coords[i]
+                for i in range(1, len(sorted_x_candidates)):
+                    if sorted_x_candidates[i] - sorted_x_candidates[i-1] < column_boundary_clustering_threshold:
+                        current_cluster_sum += sorted_x_candidates[i]
                         current_cluster_count += 1
                     else:
-                        column_x_candidates.append(current_cluster_sum / current_cluster_count)
-                        current_cluster_sum = all_x0_coords[i]
+                        final_column_boundaries.append(current_cluster_sum / current_cluster_count)
+                        current_cluster_sum = sorted_x_candidates[i]
                         current_cluster_count = 1
-                column_x_candidates.append(current_cluster_sum / current_cluster_count)
+                final_column_boundaries.append(current_cluster_sum / current_cluster_count)
 
-            initial_column_boundaries = {page.rect.x0, page.rect.x1}
-            for x_cand in column_x_candidates:
-                if page.rect.x0 < x_cand < page.rect.x1:
-                    initial_column_boundaries.add(x_cand)
+            final_column_boundaries = sorted(list(set(final_column_boundaries)))
 
-            final_column_boundaries = sorted(list(initial_column_boundaries))
+            min_effective_column_width = max(10, avg_word_height * 1.5) # Minimum width for a valid column
 
             refined_column_boundaries = []
-            # Adjusted dynamic minimum pixel width for a column to be considered distinct
-            # Make it less aggressive in merging columns to preserve narrow ones
-            dynamic_min_column_width = max(5, avg_word_height * 0.5) 
-
             if final_column_boundaries:
                 refined_column_boundaries.append(final_column_boundaries[0])
                 for i in range(1, len(final_column_boundaries)):
-                    if final_column_boundaries[i] - refined_column_boundaries[-1] > dynamic_min_column_width:
+                    if final_column_boundaries[i] - refined_column_boundaries[-1] > min_effective_column_width:
                         refined_column_boundaries.append(final_column_boundaries[i])
             
             if len(refined_column_boundaries) < 2:
@@ -167,7 +170,7 @@ def pdf_to_excel():
                 continue
             
             final_column_boundaries = refined_column_boundaries
-            # --- End Improved Column Detection ---
+            # --- End Refined Column Detection ---
 
             # Now process each line (row) using the determined column boundaries
             for line_words in final_lines:
@@ -177,82 +180,60 @@ def pdf_to_excel():
                 
                 line_words.sort(key=lambda w: w[0])
 
-                for w in line_words:
-                    word_x0 = w[0]
-                    word_x1 = w[2]
-                    word_text = w[4]
+                words_processed_in_line = [False] * len(line_words)
 
-                    best_col_idx = -1
-                    max_current_overlap_width = 0
+                # Assign words to the most appropriate column
+                for col_idx in range(len(final_column_boundaries) - 1):
+                    col_left_bound = final_column_boundaries[col_idx]
+                    col_right_bound = final_column_boundaries[col_idx + 1]
+                    
+                    words_in_current_cell = []
+                    for i, w in enumerate(line_words):
+                        if words_processed_in_line[i]: continue
 
-                    # Pass 1: Look for significant overlap (main assignment)
-                    for col_idx in range(len(final_column_boundaries) - 1):
-                        col_left_bound = final_column_boundaries[col_idx]
-                        col_right_bound = final_column_boundaries[col_idx + 1]
+                        word_x0 = w[0]
+                        word_x1 = w[2]
+                        word_center_x = (word_x0 + word_x1) / 2
 
-                        overlap_start = max(word_x0, col_left_bound)
-                        overlap_end = min(word_x1, col_right_bound)
-                        current_overlap_width = max(0, overlap_end - overlap_start)
-
+                        is_center_in_col = col_left_bound <= word_center_x <= col_right_bound
+                        overlap_with_col = max(0, min(word_x1, col_right_bound) - max(word_x0, col_left_bound))
                         word_width = w[2] - w[0]
-                        
-                        if word_width > 0:
-                            overlap_ratio = current_overlap_width / word_width
-                            word_center_x = (word_x0 + word_x1) / 2
-                            is_center_in_col = col_left_bound <= word_center_x <= col_right_bound
+                        overlap_ratio = overlap_with_col / word_width if word_width > 0 else 0
 
-                            # Criteria for a "strong" fit
-                            if overlap_ratio > 0.6 or (is_center_in_col and current_overlap_width > 0):
-                                if current_overlap_width > max_current_overlap_width:
-                                    max_current_overlap_width = current_overlap_width
-                                    best_col_idx = col_idx
+                        # Strong criteria for primary assignment to a column
+                        if is_center_in_col or overlap_ratio > 0.7:
+                            words_in_current_cell.append(w)
+                            words_processed_in_line[i] = True
 
-                    # Pass 2: If no strong fit, look for any overlap (even small ones)
-                    if best_col_idx == -1:
-                        max_current_overlap_width = 0 # Reset for this pass to find best of partials
-                        for col_idx in range(len(final_column_boundaries) - 1):
-                            col_left_bound = final_column_boundaries[col_idx]
-                            col_right_bound = final_column_boundaries[col_idx + 1]
+                    if words_in_current_cell:
+                        words_in_current_cell.sort(key=lambda x: x[0])
+                        row[col_idx] = " ".join([w[4] for w in words_in_current_cell])
 
-                            overlap_start = max(word_x0, col_left_bound)
-                            overlap_end = min(word_x1, col_right_bound)
-                            current_overlap_width = max(0, overlap_end - overlap_start)
-                            
-                            if current_overlap_width > 0: # Any overlap counts now
-                                if current_overlap_width > max_current_overlap_width: # Still take the largest partial overlap
-                                    max_current_overlap_width = current_overlap_width
-                                    best_col_idx = col_idx
+                # Fallback for any remaining unprocessed words: assign to the closest column
+                for i, w in enumerate(line_words):
+                    if not words_processed_in_line[i]:
+                        word_center_x = (w[0] + w[2]) / 2
 
-                    # Pass 3: If still no column found (word is completely outside any defined column)
-                    # Assign to the closest column to ensure no data is skipped.
-                    if best_col_idx == -1:
-                        min_dist_to_col = float('inf')
-                        fallback_col_idx = 0 # Default to the first column if nothing else
-                        
+                        min_dist = float('inf')
+                        closest_col_idx = -1
+
                         for col_idx in range(len(final_column_boundaries) - 1):
                             col_left_bound = final_column_boundaries[col_idx]
                             col_right_bound = final_column_boundaries[col_idx + 1]
                             
-                            dist = float('inf')
-                            if word_x1 < col_left_bound: # Word is completely to the left of the column
-                                dist = col_left_bound - word_x1
-                            elif word_x0 > col_right_bound: # Word is completely to the right of the column
-                                dist = word_x0 - col_right_bound
-                            else: # Word is overlapping the column boundaries, or fully inside
-                                dist = 0 # It's considered 'in' the column range, so distance is 0
-                            
-                            if dist < min_dist_to_col:
-                                min_dist_to_col = dist
-                                fallback_col_idx = col_idx
-                        best_col_idx = fallback_col_idx # Assign the closest one found
+                            col_center = (col_left_bound + col_right_bound) / 2
+                            dist = abs(word_center_x - col_center)
 
-
-                    # Finally, append the word to the chosen cell
-                    if best_col_idx != -1:
-                        if row[best_col_idx]:
-                            row[best_col_idx] += " " + word_text
-                        else:
-                            row[best_col_idx] = word_text
+                            if dist < min_dist:
+                                min_dist = dist
+                                closest_col_idx = col_idx
+                        
+                        if closest_col_idx != -1:
+                            if row[closest_col_idx]:
+                                row[closest_col_idx] += " " + w[4]
+                            else:
+                                row[closest_col_idx] = w[4]
+                        words_processed_in_line[i] = True
 
                 all_pages_data.append(row)
 
